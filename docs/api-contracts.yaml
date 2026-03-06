@@ -1,0 +1,554 @@
+openapi: 3.1.0
+info:
+  title: Auth Service API
+  description: |
+    Microservicio de autenticacion basado en tokens opacos.
+    Genera, valida y revoca tokens criptograficamente seguros almacenados en Redis.
+  version: 1.0.0
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8100
+    description: Desarrollo local
+  - url: https://auth.example.com
+    description: Produccion
+
+tags:
+  - name: tokens
+    description: Generacion, validacion y revocacion de tokens
+  - name: services
+    description: Registro y gestion de servicios consumidores
+  - name: health
+    description: Estado del servicio
+
+paths:
+  /api/v1/tokens:
+    post:
+      tags: [tokens]
+      operationId: generateToken
+      summary: Generar par de tokens (access + refresh)
+      description: |
+        Autentica un servicio registrado y genera un par de tokens opacos.
+        El access token se usa para autenticar requests.
+        El refresh token se usa para obtener un nuevo access token sin re-autenticarse.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenGenerateRequest'
+      responses:
+        '201':
+          description: Tokens generados exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+        '401':
+          description: Credenciales invalidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Servicio bloqueado por exceso de intentos fallidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateLimitResponse'
+
+  /api/v1/tokens/verify:
+    post:
+      tags: [tokens]
+      operationId: verifyToken
+      summary: Validar un token opaco
+      description: |
+        Verifica si un token es valido y retorna sus datos asociados
+        (service_id, scopes, expiracion). Disenado para ser ultra-rapido
+        usando cache local + Redis.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenVerifyRequest'
+      responses:
+        '200':
+          description: Resultado de la validacion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenVerifyResponse'
+
+  /api/v1/tokens/refresh:
+    post:
+      tags: [tokens]
+      operationId: refreshToken
+      summary: Refrescar un access token
+      description: |
+        Genera un nuevo par de tokens usando un refresh token valido.
+        El refresh token usado se invalida (rotacion de tokens).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+      responses:
+        '201':
+          description: Nuevo par de tokens generado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPairResponse'
+        '401':
+          description: Refresh token invalido o expirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/tokens/{token_id}:
+    delete:
+      tags: [tokens]
+      operationId: revokeToken
+      summary: Revocar un token especifico
+      description: Elimina un token de Redis, invalidandolo inmediatamente.
+      parameters:
+        - name: token_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID del token a revocar
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Token revocado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          description: Token no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/tokens/revoke-all/{service_id}:
+    delete:
+      tags: [tokens]
+      operationId: revokeAllServiceTokens
+      summary: Revocar todos los tokens de un servicio
+      description: Elimina todos los tokens (access y refresh) asociados a un servicio.
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: ID del servicio
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Tokens revocados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevokeAllResponse'
+
+  /api/v1/tokens/introspect:
+    post:
+      tags: [tokens]
+      operationId: introspectToken
+      summary: Introspeccion de token (RFC 7662)
+      description: Retorna metadata completa de un token en formato OAuth 2.0.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenIntrospectRequest'
+      responses:
+        '200':
+          description: Metadata del token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenIntrospectResponse'
+
+  /api/v1/services:
+    post:
+      tags: [services]
+      operationId: registerService
+      summary: Registrar un nuevo servicio
+      description: |
+        Registra un servicio consumidor con sus credenciales (client_id + client_secret).
+        El client_secret se almacena hasheado con SHA-256.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceRegisterRequest'
+      responses:
+        '201':
+          description: Servicio registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceRegisterResponse'
+        '409':
+          description: Servicio ya existe
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [services]
+      operationId: listServices
+      summary: Listar servicios registrados
+      description: Retorna todos los servicios registrados (sin secrets).
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de servicios
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceListResponse'
+
+  /api/v1/services/{service_id}:
+    get:
+      tags: [services]
+      operationId: getService
+      summary: Obtener detalle de un servicio
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Detalle del servicio
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceDetailResponse'
+        '404':
+          description: Servicio no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [services]
+      operationId: deleteService
+      summary: Eliminar un servicio y todos sus tokens
+      parameters:
+        - name: service_id
+          in: path
+          required: true
+          schema:
+            type: string
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Servicio eliminado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /health:
+    get:
+      tags: [health]
+      operationId: healthCheck
+      summary: Health check del servicio
+      responses:
+        '200':
+          description: Servicio saludable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Servicio degradado (Redis no disponible)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Token opaco generado por este servicio
+
+  schemas:
+    # --- Requests ---
+
+    TokenGenerateRequest:
+      type: object
+      required: [client_id, client_secret]
+      properties:
+        client_id:
+          type: string
+          example: "my-frontend-app"
+        client_secret:
+          type: string
+          example: "s3cr3t-k3y"
+        scopes:
+          type: array
+          items:
+            type: string
+          default: ["read"]
+          example: ["read", "write"]
+        access_ttl:
+          type: integer
+          description: TTL del access token en segundos
+          default: 3600
+          example: 3600
+        refresh_ttl:
+          type: integer
+          description: TTL del refresh token en segundos
+          default: 2592000
+          example: 2592000
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Metadata arbitraria asociada al token
+          example: {"environment": "production"}
+
+    TokenVerifyRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: Token opaco a validar
+
+    TokenRefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+          description: Refresh token para obtener nuevo access token
+
+    TokenIntrospectRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+
+    ServiceRegisterRequest:
+      type: object
+      required: [service_id, service_name, client_id, client_secret]
+      properties:
+        service_id:
+          type: string
+          example: "payment-service"
+        service_name:
+          type: string
+          example: "Payment Service"
+        client_id:
+          type: string
+          example: "payment-svc"
+        client_secret:
+          type: string
+          example: "super-secret-key"
+        description:
+          type: string
+          default: ""
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+          default: ["read", "write"]
+          description: Scopes que este servicio puede solicitar
+        rate_limit:
+          type: integer
+          description: Maximo de validaciones por minuto (0 = sin limite)
+          default: 0
+
+    # --- Responses ---
+
+    TokenPairResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: Token opaco para autenticar requests
+        refresh_token:
+          type: string
+          description: Token para refrescar el access token
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_in:
+          type: integer
+          description: Segundos hasta la expiracion del access token
+        scopes:
+          type: array
+          items:
+            type: string
+        service_id:
+          type: string
+
+    TokenVerifyResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        token_data:
+          type: object
+          nullable: true
+          properties:
+            token_type:
+              type: string
+              enum: [access]
+            service_id:
+              type: string
+            service_name:
+              type: string
+            scopes:
+              type: array
+              items:
+                type: string
+            created_at:
+              type: string
+              format: date-time
+            expires_at:
+              type: string
+              format: date-time
+            metadata:
+              type: object
+
+    TokenIntrospectResponse:
+      type: object
+      description: RFC 7662 Token Introspection
+      properties:
+        active:
+          type: boolean
+        scope:
+          type: string
+          description: Scopes separados por espacio
+        client_id:
+          type: string
+        token_type:
+          type: string
+          enum: [Bearer]
+        exp:
+          type: integer
+          description: Timestamp UNIX de expiracion
+        iat:
+          type: integer
+          description: Timestamp UNIX de creacion
+
+    RevokeAllResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        service_id:
+          type: string
+        revoked_count:
+          type: integer
+
+    ServiceRegisterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        service_id:
+          type: string
+
+    ServiceDetailResponse:
+      type: object
+      properties:
+        service_id:
+          type: string
+        service_name:
+          type: string
+        client_id:
+          type: string
+        description:
+          type: string
+        allowed_scopes:
+          type: array
+          items:
+            type: string
+        rate_limit:
+          type: integer
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        active_tokens:
+          type: integer
+          description: Cantidad de tokens activos
+
+    ServiceListResponse:
+      type: object
+      properties:
+        services:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceDetailResponse'
+        total:
+          type: integer
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+        redis:
+          type: string
+          enum: [connected, disconnected]
+        version:
+          type: string
+        uptime_seconds:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
+
+    SuccessResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+
+    RateLimitResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        retry_after:
+          type: integer
+          description: Segundos hasta que se levante el bloqueo
