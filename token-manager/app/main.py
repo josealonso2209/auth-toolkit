@@ -1,6 +1,9 @@
 import logging
+import os
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 
 from app.core.config import settings
 from app.core.database import Base, engine
@@ -58,3 +61,17 @@ def on_startup():
 @app.get("/health")
 async def health():
     return {"status": "healthy", "service": "token-manager"}
+
+
+# --- SPA: servir frontend React (solo en produccion con build) ---
+DIST_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ui", "dist")
+
+if os.path.isdir(DIST_DIR):
+    app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
+
+    @app.get("/{path:path}")
+    async def serve_spa(path: str):
+        file_path = os.path.join(DIST_DIR, path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(DIST_DIR, "index.html"))
