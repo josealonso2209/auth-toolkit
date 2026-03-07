@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     max_failed_attempts: int = 5
     lockout_duration: int = 300  # 5 minutos
 
+    # CORS
+    cors_origins: str = ""
+
     # Logging
     log_level: str = "info"
 
