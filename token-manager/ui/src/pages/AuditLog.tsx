@@ -4,16 +4,19 @@ import {
   Chip,
   Select,
   SelectItem,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
   TableColumn,
   TableHeader,
   TableRow,
+  Tooltip,
 } from "@heroui/react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import type { AuditLog as AuditLogType } from "@/types";
 import * as api from "@/api/client";
+import { toast } from "@/components/Toast";
 
 const ACTIONS = [
   "token.generate",
@@ -60,7 +63,9 @@ export default function AuditLog() {
         offset: page * PAGE_SIZE,
       });
       setLogs(data);
-    } catch {} finally {
+    } catch {
+      toast.error("Error al cargar registros de auditoria");
+    } finally {
       setLoading(false);
     }
   };
@@ -69,19 +74,27 @@ export default function AuditLog() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold">Auditoria</h1>
-        <Select
-          label="Filtrar por accion"
-          className="max-w-xs"
-          selectedKeys={filter ? [filter] : []}
-          onSelectionChange={(keys) => {
-            setFilter(Array.from(keys)[0] as string || "");
-            setPage(0);
-          }}
-        >
-          {ACTIONS.map((a) => <SelectItem key={a}>{a}</SelectItem>)}
-        </Select>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Select
+            label="Filtrar por accion"
+            className="w-full sm:max-w-xs"
+            size="sm"
+            selectedKeys={filter ? [filter] : []}
+            onSelectionChange={(keys) => {
+              setFilter(Array.from(keys)[0] as string || "");
+              setPage(0);
+            }}
+          >
+            {ACTIONS.map((a) => <SelectItem key={a}>{a}</SelectItem>)}
+          </Select>
+          <Tooltip content="Recargar">
+            <Button isIconOnly size="sm" variant="flat" onPress={load}>
+              <RefreshCw size={16} />
+            </Button>
+          </Tooltip>
+        </div>
       </div>
 
       <Table aria-label="Audit logs">
@@ -93,7 +106,18 @@ export default function AuditLog() {
           <TableColumn>Detalle</TableColumn>
           <TableColumn>IP</TableColumn>
         </TableHeader>
-        <TableBody items={logs} isLoading={loading} emptyContent="Sin registros">
+        <TableBody
+          items={logs}
+          isLoading={loading}
+          loadingContent={
+            <div className="w-full space-y-3 p-4">
+              {[...Array(6)].map((_, i) => (
+                <Skeleton key={i} className="w-full h-10 rounded-lg" />
+              ))}
+            </div>
+          }
+          emptyContent="Sin registros"
+        >
           {(log) => (
             <TableRow key={log.id}>
               <TableCell className="text-sm text-default-400 whitespace-nowrap">
@@ -118,7 +142,7 @@ export default function AuditLog() {
         </TableBody>
       </Table>
 
-      <div className="flex justify-center gap-2">
+      <div className="flex justify-center items-center gap-2">
         <Button
           isIconOnly
           size="sm"
@@ -128,7 +152,7 @@ export default function AuditLog() {
         >
           <ChevronLeft size={16} />
         </Button>
-        <Chip variant="flat">Pagina {page + 1}</Chip>
+        <Chip variant="flat" size="sm">Pagina {page + 1}</Chip>
         <Button
           isIconOnly
           size="sm"

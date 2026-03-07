@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { Button, Card, CardBody, CardHeader, Input } from "@heroui/react";
-import { Key } from "lucide-react";
+import { Key, LogIn } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import * as api from "@/api/client";
 
@@ -24,44 +24,50 @@ export default function Login() {
       setAuth(res.user, res.session_id);
       navigate("/");
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Credenciales invalidas");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Card className="w-full max-w-md">
-        <CardHeader className="flex flex-col items-center gap-2 pt-8">
-          <div className="p-3 rounded-full bg-primary/10">
-            <Key className="text-primary" size={28} />
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="flex flex-col items-center gap-2 pt-8 pb-0">
+          <div className="p-4 rounded-full bg-primary/10">
+            <Key className="text-primary" size={32} />
           </div>
           <h1 className="text-2xl font-bold">Auth Toolkit</h1>
           <p className="text-default-500 text-sm">Token Manager</p>
         </CardHeader>
-        <CardBody className="px-8 pb-8">
+        <CardBody className="px-8 pb-8 pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               label="Usuario"
               value={username}
               onValueChange={setUsername}
               autoFocus
+              size="lg"
             />
             <Input
               label="Contraseña"
               type="password"
               value={password}
               onValueChange={setPassword}
+              size="lg"
             />
             {error && (
-              <p className="text-danger text-sm text-center">{error}</p>
+              <div className="p-3 rounded-lg bg-danger-50 dark:bg-danger-900/30 border border-danger-200 dark:border-danger-800">
+                <p className="text-danger text-sm text-center">{error}</p>
+              </div>
             )}
             <Button
               type="submit"
               color="primary"
               className="w-full"
+              size="lg"
               isLoading={loading}
+              startContent={!loading ? <LogIn size={18} /> : undefined}
             >
               Iniciar sesion
             </Button>
