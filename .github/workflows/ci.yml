@@ -1,10 +1,14 @@
-name: CI
+name: CI/CD
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
 
 jobs:
   test-auth-service:
@@ -68,18 +72,50 @@ jobs:
       - name: Ejecutar tests
         run: python -m pytest tests/ -v
 
-  build:
-    name: Build Docker images
+  publish:
+    name: Publicar imagenes a GHCR
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [test-auth-service, test-token-manager]
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build auth-service
-        run: docker build --target production -t auth-service:ci ./auth-service
+      - name: Login a GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build token-manager
-        run: docker build --target production -t token-manager:ci ./token-manager
+      - name: Build y push auth-service
+        uses: docker/build-push-action@v6
+        with:
+          context: ./auth-service
+          target: production
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/auth-service:latest
+            ${{ env.IMAGE_PREFIX }}/auth-service:${{ github.sha }}
 
-      - name: Build nginx
-        run: docker build -t nginx-proxy:ci ./nginx
+      - name: Build y push token-manager
+        uses: docker/build-push-action@v6
+        with:
+          context: ./token-manager
+          target: production
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/token-manager:latest
+            ${{ env.IMAGE_PREFIX }}/token-manager:${{ github.sha }}
+
+      - name: Build y push nginx
+        uses: docker/build-push-action@v6
+        with:
+          context: ./nginx
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/nginx:latest
+            ${{ env.IMAGE_PREFIX }}/nginx:${{ github.sha }}
+
