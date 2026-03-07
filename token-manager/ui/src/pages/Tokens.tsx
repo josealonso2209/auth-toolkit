@@ -13,6 +13,7 @@ import {
 import { Key, Trash2 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import * as api from "@/api/client";
+import { toast } from "@/components/Toast";
 
 const SCOPE_OPTIONS = [
   { key: "read", label: "read" },
@@ -35,16 +36,13 @@ export default function Tokens() {
   });
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [revokeId, setRevokeId] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [revoking, setRevoking] = useState(false);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
     setGeneratedToken(null);
-    setLoading(true);
+    setGenerating(true);
     try {
       const res = await api.generateToken({
         service_id: form.service_id,
@@ -55,40 +53,31 @@ export default function Tokens() {
         expiration_days: parseInt(form.expiration_days),
       });
       setGeneratedToken(res.token);
-      setSuccess(`Token generado (expira en ${form.expiration_days} dias)`);
+      toast.success(`Token generado (expira en ${form.expiration_days} dias)`);
     } catch (err: any) {
-      setError(err.message);
+      toast.error(err.message || "Error al generar token");
     } finally {
-      setLoading(false);
+      setGenerating(false);
     }
   };
 
   const handleRevoke = async () => {
     if (!revokeId.trim()) return;
-    setError("");
-    setSuccess("");
-    setLoading(true);
+    setRevoking(true);
     try {
       await api.revokeToken(revokeId.trim());
-      setSuccess("Token revocado exitosamente");
+      toast.success("Token revocado exitosamente");
       setRevokeId("");
     } catch (err: any) {
-      setError(err.message);
+      toast.error(err.message || "Error al revocar token");
     } finally {
-      setLoading(false);
+      setRevoking(false);
     }
   };
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Gestion de Tokens</h1>
-
-      {error && (
-        <div className="p-3 rounded-lg bg-danger-50 text-danger text-sm">{error}</div>
-      )}
-      {success && (
-        <div className="p-3 rounded-lg bg-success-50 text-success text-sm">{success}</div>
-      )}
 
       {generatedToken && (
         <Card className="border-success border">
@@ -155,7 +144,7 @@ export default function Tokens() {
                   min={1}
                   max={365}
                 />
-                <Button type="submit" color="primary" isLoading={loading} className="w-full">
+                <Button type="submit" color="primary" isLoading={generating} className="w-full">
                   Generar Token
                 </Button>
               </form>
@@ -180,7 +169,7 @@ export default function Tokens() {
               <Button
                 color="danger"
                 onPress={handleRevoke}
-                isLoading={loading}
+                isLoading={revoking}
                 isDisabled={!revokeId.trim()}
                 className="w-full"
               >

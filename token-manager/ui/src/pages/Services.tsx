@@ -10,6 +10,7 @@ import {
 } from "@heroui/react";
 import { Server } from "lucide-react";
 import * as api from "@/api/client";
+import { toast } from "@/components/Toast";
 
 const SCOPE_OPTIONS = [
   { key: "read", label: "read" },
@@ -29,13 +30,9 @@ export default function Services() {
     rate_limit: "0",
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
     setLoading(true);
     try {
       await api.registerService({
@@ -43,7 +40,7 @@ export default function Services() {
         allowed_scopes: Array.from(form.allowed_scopes),
         rate_limit: parseInt(form.rate_limit),
       });
-      setSuccess(`Servicio ${form.service_id} registrado`);
+      toast.success(`Servicio "${form.service_id}" registrado exitosamente`);
       setForm({
         service_id: "",
         service_name: "",
@@ -54,7 +51,7 @@ export default function Services() {
         rate_limit: "0",
       });
     } catch (err: any) {
-      setError(err.message);
+      toast.error(err.message || "Error al registrar servicio");
     } finally {
       setLoading(false);
     }
@@ -64,9 +61,6 @@ export default function Services() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Servicios</h1>
 
-      {error && <div className="p-3 rounded-lg bg-danger-50 text-danger text-sm">{error}</div>}
-      {success && <div className="p-3 rounded-lg bg-success-50 text-success text-sm">{success}</div>}
-
       <Card className="max-w-2xl">
         <CardHeader className="flex gap-2">
           <Server size={20} />
@@ -74,7 +68,7 @@ export default function Services() {
         </CardHeader>
         <CardBody>
           <form onSubmit={handleRegister} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Service ID"
                 value={form.service_id}
@@ -88,7 +82,7 @@ export default function Services() {
                 isRequired
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="Client ID"
                 value={form.client_id}

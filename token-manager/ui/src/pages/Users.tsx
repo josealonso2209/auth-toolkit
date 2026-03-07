@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   Button,
-  Card,
-  CardBody,
-  CardHeader,
   Chip,
   Input,
   Modal,
@@ -13,17 +10,21 @@ import {
   ModalHeader,
   Select,
   SelectItem,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
   TableColumn,
   TableHeader,
   TableRow,
+  Tooltip,
   useDisclosure,
 } from "@heroui/react";
-import { UserPlus, Trash2 } from "lucide-react";
+import { UserPlus, Trash2, ShieldCheck, ShieldOff } from "lucide-react";
 import type { User } from "@/types";
 import * as api from "@/api/client";
+import { toast } from "@/components/Toast";
+import ConfirmModal from "@/components/ConfirmModal";
 
 const ROLES = [
   { key: "admin", label: "Admin" },
@@ -42,13 +43,17 @@ export default function Users() {
   const [loading, setLoading] = useState(true);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [form, setForm] = useState({ username: "", email: "", password: "", role: "viewer" });
-  const [error, setError] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     try {
-      const data = await api.listUsers();
-      setUsers(data);
-    } catch {} finally {
+      setUsers(await api.listUsers());
+    } catch {
+      toast.error("Error al cargar usuarios");
+    } finally {
       setLoading(false);
     }
   };
@@ -56,30 +61,43 @@ export default function Users() {
   useEffect(() => { load(); }, []);
 
   const handleCreate = async () => {
-    setError("");
+    setCreating(true);
     try {
       await api.createUser(form);
+      toast.success(`Usuario "${form.username}" creado`);
       onClose();
       setForm({ username: "", email: "", password: "", role: "viewer" });
       load();
     } catch (err: any) {
-      setError(err.message);
+      toast.error(err.message || "Error al crear usuario");
+    } finally {
+      setCreating(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Eliminar este usuario?")) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await api.deleteUser(id);
+      await api.deleteUser(deleteTarget.id);
+      toast.success(`Usuario "${deleteTarget.username}" eliminado`);
+      setDeleteTarget(null);
       load();
-    } catch {}
+    } catch (err: any) {
+      toast.error(err.message || "Error al eliminar usuario");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleToggleActive = async (user: User) => {
     try {
       await api.updateUser(user.id, { is_active: !user.is_active });
+      toast.success(`Usuario "${user.username}" ${user.is_active ? "desactivado" : "activado"}`);
       load();
-    } catch {}
+    } catch (err: any) {
+      toast.error(err.message || "Error al actualizar usuario");
+    }
   };
 
   return (
@@ -100,7 +118,18 @@ export default function Users() {
           <TableColumn>Creado</TableColumn>
           <TableColumn>Acciones</TableColumn>
         </TableHeader>
-        <TableBody items={users} isLoading={loading} emptyContent="Sin usuarios">
+        <TableBody
+          items={users}
+          isLoading={loading}
+          loadingContent={
+            <div className="w-full space-y-3 p-4">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="w-full h-10 rounded-lg" />
+              ))}
+            </div>
+          }
+          emptyContent="Sin usuarios"
+        >
           {(user) => (
             <TableRow key={user.id}>
               <TableCell className="font-medium">{user.username}</TableCell>
@@ -111,40 +140,44 @@ export default function Users() {
                 </Chip>
               </TableCell>
               <TableCell>
-                <Chip
-                  size="sm"
-                  color={user.is_active ? "success" : "default"}
-                  variant="dot"
-                  className="cursor-pointer"
-                  onClick={() => handleToggleActive(user)}
-                >
-                  {user.is_active ? "Activo" : "Inactivo"}
-                </Chip>
+                <Tooltip content={user.is_active ? "Clic para desactivar" : "Clic para activar"}>
+                  <Chip
+                    size="sm"
+                    color={user.is_active ? "success" : "default"}
+                    variant="dot"
+                    className="cursor-pointer"
+                    onClick={() => handleToggleActive(user)}
+                  >
+                    {user.is_active ? "Activo" : "Inactivo"}
+                  </Chip>
+                </Tooltip>
               </TableCell>
               <TableCell className="text-default-400 text-sm">
                 {new Date(user.created_at).toLocaleDateString()}
               </TableCell>
               <TableCell>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="light"
-                  color="danger"
-                  onPress={() => handleDelete(user.id)}
-                >
-                  <Trash2 size={16} />
-                </Button>
+                <Tooltip content="Eliminar usuario" color="danger">
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="light"
+                    color="danger"
+                    onPress={() => setDeleteTarget(user)}
+                  >
+                    <Trash2 size={16} />
+                  </Button>
+                </Tooltip>
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
 
+      {/* Modal crear usuario */}
       <Modal isOpen={isOpen} onClose={onClose}>
         <ModalContent>
           <ModalHeader>Nuevo usuario</ModalHeader>
           <ModalBody className="space-y-4">
-            {error && <p className="text-danger text-sm">{error}</p>}
             <Input label="Usuario" value={form.username} onValueChange={(v) => setForm({ ...form, username: v })} />
             <Input label="Email" type="email" value={form.email} onValueChange={(v) => setForm({ ...form, email: v })} />
             <Input label="Contraseña" type="password" value={form.password} onValueChange={(v) => setForm({ ...form, password: v })} />
@@ -153,11 +186,23 @@ export default function Users() {
             </Select>
           </ModalBody>
           <ModalFooter>
-            <Button variant="flat" onPress={onClose}>Cancelar</Button>
-            <Button color="primary" onPress={handleCreate}>Crear</Button>
+            <Button variant="flat" onPress={onClose} isDisabled={creating}>Cancelar</Button>
+            <Button color="primary" onPress={handleCreate} isLoading={creating}>Crear</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Modal confirmar eliminacion */}
+      <ConfirmModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Eliminar usuario"
+        message={`¿Estas seguro de eliminar al usuario "${deleteTarget?.username}"? Esta accion no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        confirmColor="danger"
+        loading={deleting}
+      />
     </div>
   );
 }
