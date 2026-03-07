@@ -97,6 +97,33 @@ def list_services() -> list[dict]:
     return services
 
 
+def list_active_tokens() -> list[dict]:
+    """Lista todos los access tokens activos con datos y TTL."""
+    services = redis_store.get_all_services()
+    tokens = []
+    for svc in services:
+        service_id = svc.get("service_id")
+        if not service_id:
+            continue
+        token_ids = redis_store.get_service_token_ids(service_id)
+        for tid in token_ids:
+            token_data = redis_store.get_token(tid)
+            if not token_data or token_data.get("token_type") != "access":
+                continue
+            ttl = redis_store.get_token_ttl(tid)
+            tokens.append({
+                "token_id": tid[:16],
+                "full_token_id": tid,
+                "service_id": token_data.get("service_id", ""),
+                "service_name": token_data.get("service_name", ""),
+                "scopes": token_data.get("scopes", []),
+                "created_at": token_data.get("created_at", ""),
+                "expires_at": token_data.get("expires_at", ""),
+                "ttl_seconds": max(ttl, 0),
+            })
+    return tokens
+
+
 def delete_service(service_id: str) -> bool:
     svc = get_service_by_id(service_id)
     if not svc:

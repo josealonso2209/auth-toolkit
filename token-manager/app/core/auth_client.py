@@ -52,7 +52,12 @@ async def generate_token(
     if resp.status_code == 201:
         return resp.json()
     logger.warning("generate_token failed: %s %s", resp.status_code, resp.text)
-    return None
+    detail = "Error generando token"
+    try:
+        detail = resp.json().get("detail", detail)
+    except Exception:
+        pass
+    raise RuntimeError(detail)
 
 
 async def verify_token(token: str) -> Optional[dict]:
@@ -64,19 +69,32 @@ async def verify_token(token: str) -> Optional[dict]:
     return None
 
 
-async def revoke_token(token_id: str, bearer: str) -> bool:
-    resp = await _delete(f"/api/v1/tokens/{token_id}", headers={"Authorization": f"Bearer {bearer}"})
+async def revoke_token(token_id: str, bearer: str = "") -> bool:
+    headers = {}
+    if bearer:
+        headers["Authorization"] = f"Bearer {bearer}"
+    resp = await _delete(f"/api/v1/tokens/{token_id}", headers=headers)
     return resp.status_code == 200
 
 
-async def revoke_all_tokens(service_id: str, bearer: str) -> int:
+async def revoke_all_tokens(service_id: str, bearer: str = "") -> int:
+    headers = {}
+    if bearer:
+        headers["Authorization"] = f"Bearer {bearer}"
     resp = await _delete(
         f"/api/v1/tokens/revoke-all/{service_id}",
-        headers={"Authorization": f"Bearer {bearer}"},
+        headers=headers,
     )
     if resp.status_code == 200:
         return resp.json().get("revoked_count", 0)
     return 0
+
+
+async def list_active_tokens() -> list[dict]:
+    resp = await _get("/api/v1/tokens/active")
+    if resp.status_code == 200:
+        return resp.json().get("tokens", [])
+    return []
 
 
 # --- Services ---
@@ -104,15 +122,21 @@ async def register_service(
     return resp.status_code == 201
 
 
-async def list_services(bearer: str) -> list[dict]:
-    resp = await _get("/api/v1/services", headers={"Authorization": f"Bearer {bearer}"})
+async def list_services(bearer: str = "") -> list[dict]:
+    headers = {}
+    if bearer:
+        headers["Authorization"] = f"Bearer {bearer}"
+    resp = await _get("/api/v1/services", headers=headers)
     if resp.status_code == 200:
         return resp.json().get("services", [])
     return []
 
 
-async def delete_service(service_id: str, bearer: str) -> bool:
-    resp = await _delete(f"/api/v1/services/{service_id}", headers={"Authorization": f"Bearer {bearer}"})
+async def delete_service(service_id: str, bearer: str = "") -> bool:
+    headers = {}
+    if bearer:
+        headers["Authorization"] = f"Bearer {bearer}"
+    resp = await _delete(f"/api/v1/services/{service_id}", headers=headers)
     return resp.status_code == 200
 
 

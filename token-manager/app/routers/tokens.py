@@ -29,12 +29,15 @@ async def generate_token(
 
     access_ttl = data.expiration_days * 24 * 3600
 
-    result = await auth_client.generate_token(
-        client_id=data.client_id,
-        client_secret=data.client_secret,
-        scopes=data.scopes,
-        access_ttl=access_ttl,
-    )
+    try:
+        result = await auth_client.generate_token(
+            client_id=data.client_id,
+            client_secret=data.client_secret,
+            scopes=data.scopes,
+            access_ttl=access_ttl,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     if not result:
         raise HTTPException(status_code=500, detail="Error generando token en auth-service")
@@ -111,11 +114,12 @@ async def list_tokens(
     user: AdminUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Lista tokens activos. Requiere un service token para consultar auth-service."""
-    # Este endpoint consulta directamente al auth-service
-    # El auth-service expone /api/v1/services que incluye active_tokens por servicio
+    """Lista tokens activos consultando al auth-service."""
     health = await auth_client.health()
-    if not health or health.get("status") != "healthy":
-        raise HTTPException(status_code=503, detail="auth-service no disponible")
-
-    return {"success": True, "auth_service_status": health}
+    tokens = await auth_client.list_active_tokens()
+    return {
+        "success": True,
+        "tokens": tokens,
+        "total": len(tokens),
+        "auth_service_status": health,
+    }

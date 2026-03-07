@@ -79,6 +79,13 @@ async def refresh_token(data: TokenRefreshRequest):
     return tokens
 
 
+@router.get("/active")
+async def list_active_tokens():
+    """Lista todos los access tokens activos con TTL."""
+    tokens = token_manager.list_active_tokens()
+    return {"tokens": tokens, "total": len(tokens)}
+
+
 @router.delete(
     "/{token_id}",
     response_model=SuccessResponse,
