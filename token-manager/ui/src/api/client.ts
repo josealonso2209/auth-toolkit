@@ -54,7 +54,14 @@ export const revokeToken = (token_id: string) =>
 export const listTokensStatus = () =>
   request<{ success: boolean; auth_service_status: any }>("/api/tokens/list");
 
+export const listActiveTokens = () =>
+  request<{ success: boolean; tokens: any[]; total: number; auth_service_status: any }>(
+    "/api/tokens/list"
+  );
+
 // Services
+export const listServices = () => request<any[]>("/api/services");
+
 export const registerService = (data: any) =>
   request("/api/services/register", {
     method: "POST",

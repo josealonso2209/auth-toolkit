@@ -48,6 +48,17 @@ export interface TokenGeneratePayload {
   expiration_days: number;
 }
 
+export interface ActiveToken {
+  token_id: string;
+  full_token_id: string;
+  service_id: string;
+  service_name: string;
+  scopes: string[];
+  created_at: string;
+  expires_at: string;
+  ttl_seconds: number;
+}
+
 export interface ServiceRegisterPayload {
   service_id: string;
   service_name: string;
