@@ -1,9 +1,14 @@
+import os
+
+# Forzar DATABASE_URL a SQLite ANTES de importar cualquier modulo de la app
+os.environ["DATABASE_URL"] = "sqlite:///test.db"
+
 import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event, Text, JSON
+from sqlalchemy import create_engine, JSON, Text, Integer, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
 
@@ -12,18 +17,6 @@ from app.core.security import hash_password
 from app.models.db import AdminUser, AdminSession
 
 # Adaptar tipos PostgreSQL para SQLite
-# Reemplazar ARRAY(Text) -> JSON, JSONB -> JSON, INET -> Text
-_pg_type_map = {JSONB: JSON, INET: Text}
-
-
-@event.listens_for(Base.metadata, "column_reflect")
-def _generalize_types(inspector, table, column_info):
-    for pg_type, generic_type in _pg_type_map.items():
-        if isinstance(column_info["type"], pg_type):
-            column_info["type"] = generic_type()
-
-
-# Parchear los tipos antes de crear tablas
 for table in Base.metadata.tables.values():
     for column in table.columns:
         col_type = column.type
@@ -33,17 +26,20 @@ for table in Base.metadata.tables.values():
             column.type = JSON()
         elif isinstance(col_type, INET):
             column.type = Text()
+        # BigInteger PK sin autoincrement falla en SQLite
+        if column.primary_key and not column.autoincrement:
+            column.autoincrement = True
 
 # SQLite en memoria para tests
-engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-TestSession = sessionmaker(bind=engine, autoflush=False)
+test_engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+TestSession = sessionmaker(bind=test_engine, autoflush=False)
 
 
 @pytest.fixture(autouse=True)
 def setup_db():
-    Base.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=test_engine)
     yield
-    Base.metadata.drop_all(bind=engine)
+    Base.metadata.drop_all(bind=test_engine)
 
 
 @pytest.fixture()
