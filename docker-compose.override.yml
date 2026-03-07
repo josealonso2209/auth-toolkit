@@ -5,7 +5,7 @@
 services:
   nginx:
     ports:
-      - "8080:80"
+      - "8088:80"
 
   redis:
     ports:
@@ -34,11 +34,9 @@ services:
 
   token-manager:
     build:
-      target: development
+      target: production
     ports:
       - "8200:8200"
     environment:
       LOG_LEVEL: debug
-    volumes:
-      - ./token-manager/app:/app/app
     read_only: false
