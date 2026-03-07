@@ -1,0 +1,44 @@
+# Override para desarrollo local.
+# Se aplica automaticamente con `docker compose up`.
+# En produccion usar: docker compose -f docker-compose.yml up
+
+services:
+  nginx:
+    ports:
+      - "8080:80"
+
+  redis:
+    ports:
+      - "6380:6379"
+    networks:
+      - backend
+      - frontend
+
+  postgres:
+    ports:
+      - "5433:5432"
+    networks:
+      - backend
+      - frontend
+
+  auth-service:
+    build:
+      target: development
+    ports:
+      - "8100:8100"
+    environment:
+      LOG_LEVEL: debug
+    volumes:
+      - ./auth-service/app:/app/app
+    read_only: false
+
+  token-manager:
+    build:
+      target: development
+    ports:
+      - "8200:8200"
+    environment:
+      LOG_LEVEL: debug
+    volumes:
+      - ./token-manager/app:/app/app
+    read_only: false
