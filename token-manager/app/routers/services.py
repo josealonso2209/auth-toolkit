@@ -11,6 +11,13 @@ from app.services import audit, webhook
 router = APIRouter(prefix="/api/services", tags=["services"])
 
 
+@router.get("")
+async def list_services(
+    user: AdminUser = Depends(require_role("admin", "operator")),
+):
+    services = await auth_client.list_services(bearer="")
+    return services
+
 @router.post("/register")
 async def register_service(
     data: ServiceRegisterRequest,

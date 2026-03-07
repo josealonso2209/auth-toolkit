@@ -29,13 +29,13 @@ async def register_service(data: ServiceRegisterRequest):
     return ServiceRegisterResponse(message="Servicio registrado", service_id=data.service_id)
 
 
-@router.get("", response_model=ServiceListResponse, dependencies=[Depends(require_valid_token)])
+@router.get("", response_model=ServiceListResponse)
 async def list_services():
     services = token_manager.list_services()
     return ServiceListResponse(services=services, total=len(services))
 
 
-@router.get("/{service_id}", response_model=ServiceDetailResponse, dependencies=[Depends(require_valid_token)])
+@router.get("/{service_id}", response_model=ServiceDetailResponse)
 async def get_service(service_id: str):
     svc = token_manager.get_service_by_id(service_id)
     if not svc:
@@ -45,7 +45,7 @@ async def get_service(service_id: str):
     return svc
 
 
-@router.delete("/{service_id}", response_model=SuccessResponse, dependencies=[Depends(require_valid_token)])
+@router.delete("/{service_id}", response_model=SuccessResponse)
 async def delete_service(service_id: str):
     if not token_manager.delete_service(service_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Servicio no encontrado")
