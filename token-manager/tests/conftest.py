@@ -1,38 +1,45 @@
 import os
 
-# Forzar DATABASE_URL a SQLite ANTES de importar cualquier modulo de la app
-os.environ["DATABASE_URL"] = "sqlite:///test.db"
+# Forzar SQLite ANTES de cualquier import de la app
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, JSON, Text, Integer, event
+from sqlalchemy import create_engine, JSON, Text, Integer, BigInteger
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
 
-from app.core.database import Base, get_db
+from app.core.database import Base
+
+# Adaptar tipos PostgreSQL → SQLite
+for table in Base.metadata.tables.values():
+    for col in table.columns:
+        if isinstance(col.type, (ARRAY, JSONB)):
+            col.type = JSON()
+        elif isinstance(col.type, INET):
+            col.type = Text()
+        if isinstance(col.type, BigInteger) and col.primary_key:
+            col.type = Integer()
+
+# Engine unico en memoria (StaticPool = misma conexion para todos)
+test_engine = create_engine(
+    "sqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+TestSession = sessionmaker(bind=test_engine, autoflush=False)
+
+# Reemplazar engine y SessionLocal ANTES de importar app.main
+import app.core.database as db_mod
+db_mod.engine = test_engine
+db_mod.SessionLocal = TestSession
+
+from app.core.database import get_db
 from app.core.security import hash_password
 from app.models.db import AdminUser, AdminSession
-
-# Adaptar tipos PostgreSQL para SQLite
-for table in Base.metadata.tables.values():
-    for column in table.columns:
-        col_type = column.type
-        if isinstance(col_type, ARRAY):
-            column.type = JSON()
-        elif isinstance(col_type, JSONB):
-            column.type = JSON()
-        elif isinstance(col_type, INET):
-            column.type = Text()
-        # BigInteger PK sin autoincrement falla en SQLite
-        if column.primary_key and not column.autoincrement:
-            column.autoincrement = True
-
-# SQLite en memoria para tests
-test_engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-TestSession = sessionmaker(bind=test_engine, autoflush=False)
 
 
 @pytest.fixture(autouse=True)
