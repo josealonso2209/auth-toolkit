@@ -1,49 +1,29 @@
-import os
-
-# Forzar SQLite ANTES de cualquier import de la app
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
-
 import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
-from sqlalchemy import create_engine, JSON, Text, Integer, BigInteger
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
 
-from app.core.database import Base
+from app.core.config import settings
+from app.core.database import Base, get_db
+from app.core.security import hash_password
+from app.models.db import AdminUser, AdminSession
 
-# Adaptar tipos PostgreSQL → SQLite
-for table in Base.metadata.tables.values():
-    for col in table.columns:
-        if isinstance(col.type, (ARRAY, JSONB)):
-            col.type = JSON()
-        elif isinstance(col.type, INET):
-            col.type = Text()
-        if isinstance(col.type, BigInteger) and col.primary_key:
-            col.type = Integer()
-
-# Engine unico en memoria (StaticPool = misma conexion para todos)
-test_engine = create_engine(
-    "sqlite:///:memory:",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
+# Engine de test usando la misma DATABASE_URL (PostgreSQL en CI)
+test_engine = create_engine(settings.database_url, pool_pre_ping=True)
 TestSession = sessionmaker(bind=test_engine, autoflush=False)
 
-# Reemplazar engine y SessionLocal ANTES de importar app.main
+# Reemplazar engine en el modulo para que on_startup use el de test
 import app.core.database as db_mod
 db_mod.engine = test_engine
 db_mod.SessionLocal = TestSession
 
-from app.core.database import get_db
-from app.core.security import hash_password
-from app.models.db import AdminUser, AdminSession
-
 
 @pytest.fixture(autouse=True)
 def setup_db():
+    Base.metadata.drop_all(bind=test_engine)
     Base.metadata.create_all(bind=test_engine)
     yield
     Base.metadata.drop_all(bind=test_engine)
@@ -55,11 +35,16 @@ def db():
     try:
         yield session
     finally:
+        session.rollback()
         session.close()
 
 
 @pytest.fixture()
 def admin_user(db):
+    # Limpiar admin que on_startup pudo haber creado
+    db.query(AdminUser).filter(AdminUser.username == "admin").delete()
+    db.commit()
+
     user = AdminUser(
         username="admin",
         email="admin@test.local",

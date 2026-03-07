@@ -31,9 +31,28 @@ jobs:
   test-token-manager:
     name: Test token-manager
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test_user"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: token-manager
+    env:
+      DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/test_db
+      AUTH_SERVICE_URL: http://localhost:8100
+      SECRET_KEY: test-secret-key
+      ADMIN_DEFAULT_PASSWORD: test-admin
     steps:
       - uses: actions/checkout@v4
 
