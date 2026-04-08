@@ -59,6 +59,23 @@ export const listActiveTokens = () =>
     "/api/tokens/list"
   );
 
+export const testToken = (token: string) =>
+  request<{
+    valid: boolean;
+    latency_ms: number;
+    token_data: {
+      service_id?: string;
+      service_name?: string;
+      scopes?: string[];
+      expires_at?: string;
+      created_at?: string;
+      [key: string]: any;
+    } | null;
+  }>("/api/tokens/test", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+
 // Services
 export const listServices = () => request<any[]>("/api/services");
 

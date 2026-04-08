@@ -3,6 +3,7 @@ import Layout from "@/components/Layout";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Tokens from "@/pages/Tokens";
+import Gateway from "@/pages/Gateway";
 import Services from "@/pages/Services";
 import Users from "@/pages/Users";
 import Webhooks from "@/pages/Webhooks";
@@ -16,6 +17,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/tokens" element={<Tokens />} />
+          <Route path="/gateway" element={<Gateway />} />
           <Route path="/services" element={<Services />} />
           <Route path="/users" element={<Users />} />
           <Route path="/webhooks" element={<Webhooks />} />
