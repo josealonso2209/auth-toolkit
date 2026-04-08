@@ -84,6 +84,15 @@ def mock_auth_client():
                 "service_id": "test-svc",
             })
             mock.verify_token = AsyncMock(return_value={"service_id": "test-svc"})
+            mock.verify_token_full = AsyncMock(return_value={
+                "valid": True,
+                "token_data": {
+                    "service_id": "test-svc",
+                    "service_name": "Test Service",
+                    "scopes": ["read"],
+                    "expires_at": "2099-01-01T00:00:00Z",
+                },
+            })
             mock.revoke_token = AsyncMock(return_value=True)
             mock.revoke_all_tokens = AsyncMock(return_value=3)
             mock.list_active_tokens = AsyncMock(return_value=[])

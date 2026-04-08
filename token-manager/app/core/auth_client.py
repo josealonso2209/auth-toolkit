@@ -69,6 +69,14 @@ async def verify_token(token: str) -> Optional[dict]:
     return None
 
 
+async def verify_token_full(token: str) -> dict:
+    """Devuelve la respuesta completa del auth-service (valid + token_data) sin filtrar."""
+    resp = await _post("/api/v1/tokens/verify", json={"token": token})
+    if resp.status_code == 200:
+        return resp.json()
+    return {"valid": False, "token_data": None}
+
+
 async def revoke_token(token_id: str, bearer: str = "") -> bool:
     headers = {}
     if bearer:

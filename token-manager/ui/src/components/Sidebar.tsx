@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Key,
+  Network,
   Server,
   Users,
   Webhook,
@@ -18,6 +19,7 @@ import * as api from "@/api/client";
 const navItems = [
   { path: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "operator", "viewer"] },
   { path: "/tokens", label: "Tokens", icon: Key, roles: ["admin", "operator", "viewer"] },
+  { path: "/gateway", label: "Gateway", icon: Network, roles: ["admin", "operator", "viewer"] },
   { path: "/services", label: "Servicios", icon: Server, roles: ["admin", "operator"] },
   { path: "/users", label: "Usuarios", icon: Users, roles: ["admin"] },
   { path: "/webhooks", label: "Webhooks", icon: Webhook, roles: ["admin"] },

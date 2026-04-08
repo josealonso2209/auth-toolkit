@@ -1,3 +1,5 @@
+import time
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
@@ -5,7 +7,12 @@ from app.core import auth_client
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_role
 from app.models.db import AdminUser
-from app.models.schemas import MessageResponse, TokenGenerateRequest, TokenRevokeRequest
+from app.models.schemas import (
+    MessageResponse,
+    TokenGenerateRequest,
+    TokenRevokeRequest,
+    TokenTestRequest,
+)
 from app.services import audit, webhook
 
 router = APIRouter(prefix="/api/tokens", tags=["tokens"])
@@ -122,4 +129,50 @@ async def list_tokens(
         "tokens": tokens,
         "total": len(tokens),
         "auth_service_status": health,
+    }
+
+
+@router.post("/test")
+async def test_token(
+    data: TokenTestRequest,
+    request: Request,
+    user: AdminUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Valida un token contra el auth-service y devuelve el resultado enriquecido.
+
+    Util para depurar integraciones de API Gateway: simula la llamada que hace
+    el gateway al validar un token entrante. Devuelve latencia, scopes,
+    expiracion y nombre del servicio.
+    """
+    if not data.token or not data.token.strip():
+        raise HTTPException(status_code=400, detail="Token vacio")
+
+    start = time.perf_counter()
+    result = await auth_client.verify_token_full(data.token.strip())
+    latency_ms = round((time.perf_counter() - start) * 1000, 2)
+
+    valid = bool(result.get("valid"))
+    token_data = result.get("token_data") or {}
+
+    audit.log_action(
+        db,
+        actor_id=user.id,
+        actor_username=user.username,
+        action="token.test",
+        resource_type="token",
+        resource_id=(data.token[:16] if data.token else None),
+        detail={
+            "valid": valid,
+            "service_id": token_data.get("service_id"),
+            "latency_ms": latency_ms,
+        },
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("User-Agent"),
+    )
+
+    return {
+        "valid": valid,
+        "latency_ms": latency_ms,
+        "token_data": token_data if valid else None,
     }
