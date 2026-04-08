@@ -44,20 +44,20 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
     <aside
       className={`${
         collapsed ? "w-[68px]" : "w-64"
-      } min-h-screen bg-content1 border-r border-divider flex flex-col transition-all duration-200`}
+      } min-h-screen bg-surface border-r border-border flex flex-col transition-all duration-200`}
     >
       {/* Header */}
-      <div className="p-4 border-b border-divider flex items-center justify-between gap-2">
+      <div className="p-4 border-b border-border flex items-center justify-between gap-2">
         {!collapsed && (
           <div className="min-w-0">
             <h1 className="text-lg font-bold text-foreground truncate">Auth Toolkit</h1>
-            <p className="text-xs text-default-500">Token Manager</p>
+            <p className="text-xs text-muted">Token Manager</p>
           </div>
         )}
         <Button
           isIconOnly
           size="sm"
-          variant="light"
+          variant="ghost"
           onPress={onToggle}
           className="flex-shrink-0"
           aria-label={collapsed ? "Expandir menu" : "Colapsar menu"}
@@ -78,8 +78,8 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
                 to={item.path}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm ${
                   active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-default-600 hover:bg-default-100"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted hover:bg-default/40"
                 } ${collapsed ? "justify-center" : ""}`}
               >
                 <item.icon size={18} className="flex-shrink-0" />
@@ -89,8 +89,9 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
 
             if (collapsed) {
               return (
-                <Tooltip key={item.path} content={item.label} placement="right">
-                  {link}
+                <Tooltip key={item.path}>
+                  <Tooltip.Trigger>{link}</Tooltip.Trigger>
+                  <Tooltip.Content>{item.label}</Tooltip.Content>
                 </Tooltip>
               );
             }
@@ -99,27 +100,30 @@ export default function Sidebar({ collapsed, onToggle }: Props) {
       </nav>
 
       {/* Footer */}
-      <div className="p-3 border-t border-divider space-y-2">
+      <div className="p-3 border-t border-border space-y-2">
         <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"}`}>
           {!collapsed && (
             <div className="min-w-0">
               <p className="text-sm font-medium truncate">{user?.username}</p>
-              <p className="text-xs text-default-400 capitalize">{user?.role}</p>
+              <p className="text-xs text-muted capitalize">{user?.role}</p>
             </div>
           )}
           <div className="flex items-center gap-1">
             <ThemeToggle />
-            <Tooltip content="Cerrar sesion" placement={collapsed ? "right" : "top"}>
-              <Button
-                isIconOnly
-                size="sm"
-                variant="light"
-                onPress={handleLogout}
-                className="text-default-400 hover:text-danger"
-                aria-label="Cerrar sesion"
-              >
-                <LogOut size={18} />
-              </Button>
+            <Tooltip>
+              <Tooltip.Trigger>
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="ghost"
+                  onPress={handleLogout}
+                  className="text-muted hover:text-danger"
+                  aria-label="Cerrar sesion"
+                >
+                  <LogOut size={18} />
+                </Button>
+              </Tooltip.Trigger>
+              <Tooltip.Content>Cerrar sesion</Tooltip.Content>
             </Tooltip>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, CardBody, CardHeader, Chip, Skeleton } from "@heroui/react";
+import { Card, Chip, Skeleton } from "@heroui/react";
 import { Activity, ScrollText, Shield, Clock } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import * as api from "@/api/client";
@@ -67,9 +67,9 @@ export default function Dashboard() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-default-500 mt-1">
+        <p className="text-muted mt-1">
           Bienvenido, {user?.username}
-          <Chip size="sm" variant="flat" className="ml-2 capitalize">
+          <Chip size="sm" variant="soft" className="ml-2 capitalize">
             {user?.role}
           </Chip>
         </p>
@@ -79,7 +79,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Auth Service Status */}
         <Card>
-          <CardBody className="flex flex-row items-center gap-4">
+          <Card.Content className="flex flex-row items-center gap-4">
             {loading ? (
               <Skeleton className="w-full h-14 rounded-lg" />
             ) : (
@@ -88,7 +88,7 @@ export default function Dashboard() {
                   <Activity size={24} className={isHealthy ? "text-success" : "text-danger"} />
                 </div>
                 <div>
-                  <p className="text-sm text-default-500">Auth Service</p>
+                  <p className="text-sm text-muted">Auth Service</p>
                   <div className="flex items-center gap-2">
                     <p className="text-xl font-bold capitalize">{stats.authServiceStatus}</p>
                     <span className={`w-2 h-2 rounded-full ${isHealthy ? "bg-success animate-pulse" : "bg-danger"}`} />
@@ -96,54 +96,54 @@ export default function Dashboard() {
                 </div>
               </>
             )}
-          </CardBody>
+          </Card.Content>
         </Card>
 
         {/* Uptime */}
         <Card>
-          <CardBody className="flex flex-row items-center gap-4">
+          <Card.Content className="flex flex-row items-center gap-4">
             {loading ? (
               <Skeleton className="w-full h-14 rounded-lg" />
             ) : (
               <>
-                <div className="p-3 rounded-lg bg-primary/10">
-                  <Clock size={24} className="text-primary" />
+                <div className="p-3 rounded-lg bg-accent/10">
+                  <Clock size={24} className="text-accent" />
                 </div>
                 <div>
-                  <p className="text-sm text-default-500">Uptime</p>
+                  <p className="text-sm text-muted">Uptime</p>
                   <p className="text-xl font-bold">{formatUptime(stats.authServiceUptime)}</p>
                 </div>
               </>
             )}
-          </CardBody>
+          </Card.Content>
         </Card>
 
         {/* Audit events */}
         <Card>
-          <CardBody className="flex flex-row items-center gap-4">
+          <Card.Content className="flex flex-row items-center gap-4">
             {loading ? (
               <Skeleton className="w-full h-14 rounded-lg" />
             ) : (
               <>
-                <div className="p-3 rounded-lg bg-secondary/10">
-                  <ScrollText size={24} className="text-secondary" />
+                <div className="p-3 rounded-lg bg-default/10">
+                  <ScrollText size={24} className="text-muted" />
                 </div>
                 <div>
-                  <p className="text-sm text-default-500">Eventos de auditoria</p>
+                  <p className="text-sm text-muted">Eventos de auditoria</p>
                   <p className="text-xl font-bold">{stats.auditTotal.toLocaleString()}</p>
                 </div>
               </>
             )}
-          </CardBody>
+          </Card.Content>
         </Card>
       </div>
 
       {/* Recent activity */}
       <Card>
-        <CardHeader className="pb-0">
+        <Card.Header className="pb-0">
           <h2 className="text-lg font-semibold">Actividad reciente</h2>
-        </CardHeader>
-        <CardBody>
+        </Card.Header>
+        <Card.Content>
           {loading ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
@@ -152,20 +152,20 @@ export default function Dashboard() {
             </div>
           ) : stats.lastActions.length === 0 ? (
             <div className="text-center py-8">
-              <Shield size={40} className="mx-auto text-default-300 mb-3" />
-              <p className="text-default-400">Sin actividad registrada</p>
+              <Shield size={40} className="mx-auto text-muted/50 mb-3" />
+              <p className="text-muted">Sin actividad registrada</p>
             </div>
           ) : (
             <div className="space-y-1">
               {stats.lastActions.map((log: any) => (
                 <div
                   key={log.id}
-                  className="flex items-center justify-between py-3 px-3 rounded-lg hover:bg-default-50 transition-colors"
+                  className="flex items-center justify-between py-3 px-3 rounded-lg hover:bg-default/10 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <Chip
                       size="sm"
-                      variant="flat"
+                      variant="soft"
                       color={
                         log.action.includes("generate") || log.action.includes("login") || log.action.includes("create")
                           ? "success"
@@ -177,19 +177,19 @@ export default function Dashboard() {
                     >
                       {log.action}
                     </Chip>
-                    <p className="text-sm text-default-500 truncate">
+                    <p className="text-sm text-muted truncate">
                       {log.actor_username}
                       {log.resource_id ? ` — ${log.resource_type}:${log.resource_id}` : ""}
                     </p>
                   </div>
-                  <p className="text-xs text-default-400 whitespace-nowrap ml-4">
+                  <p className="text-xs text-muted whitespace-nowrap ml-4">
                     {new Date(log.timestamp).toLocaleString()}
                   </p>
                 </div>
               ))}
             </div>
           )}
-        </CardBody>
+        </Card.Content>
       </Card>
     </div>
   );
