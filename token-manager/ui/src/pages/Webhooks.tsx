@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Button,
+  Card,
   Chip,
   TextField,
   Label,
@@ -11,11 +12,32 @@ import {
   Tooltip,
   useOverlayState,
 } from "@heroui/react";
-import { Plus, Trash2 } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Eye,
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Send,
+} from "lucide-react";
 import type { Webhook } from "@/types";
 import * as api from "@/api/client";
 import { toast } from "@/components/Toast";
 import ConfirmModal from "@/components/ConfirmModal";
+
+type Delivery = {
+  id: number;
+  webhook_id: number;
+  event: string;
+  payload: any;
+  response_status: number | null;
+  success: boolean;
+  attempt: number;
+  delivered_at: string;
+  duration_ms: number | null;
+};
 
 const EVENTS = [
   "token.generated",
@@ -35,6 +57,12 @@ export default function Webhooks() {
 
   const [deleteTarget, setDeleteTarget] = useState<Webhook | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Detalle + deliveries
+  const [detailWebhook, setDetailWebhook] = useState<Webhook | null>(null);
+  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [loadingDeliveries, setLoadingDeliveries] = useState(false);
+  const [retryingId, setRetryingId] = useState<number | null>(null);
 
   const load = async () => {
     try {
@@ -84,6 +112,51 @@ export default function Webhooks() {
       toast.error(err.message || "Error al eliminar webhook");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const openDetail = async (wh: Webhook) => {
+    setDetailWebhook(wh);
+    setDeliveries([]);
+    setLoadingDeliveries(true);
+    try {
+      const data = await api.listDeliveries(wh.id);
+      setDeliveries(data || []);
+    } catch (err: any) {
+      toast.error(err.message || "Error al cargar deliveries");
+    } finally {
+      setLoadingDeliveries(false);
+    }
+  };
+
+  const refreshDeliveries = async () => {
+    if (!detailWebhook) return;
+    setLoadingDeliveries(true);
+    try {
+      const data = await api.listDeliveries(detailWebhook.id);
+      setDeliveries(data || []);
+    } catch {
+      /* silenciar */
+    } finally {
+      setLoadingDeliveries(false);
+    }
+  };
+
+  const handleRetry = async (delivery: Delivery) => {
+    if (!detailWebhook) return;
+    setRetryingId(delivery.id);
+    try {
+      const result = await api.retryDelivery(detailWebhook.id, delivery.id);
+      if (result.success) {
+        toast.success(`Reintento exitoso (HTTP ${result.response_status})`);
+      } else {
+        toast.error(`Reintento fallo (HTTP ${result.response_status ?? "??"})`);
+      }
+      await refreshDeliveries();
+    } catch (err: any) {
+      toast.error(err.message || "Error al reintentar");
+    } finally {
+      setRetryingId(null);
     }
   };
 
@@ -160,14 +233,24 @@ export default function Webhooks() {
                     </Tooltip>
                   </Table.Cell>
                   <Table.Cell>
-                    <Tooltip>
-                      <Tooltip.Trigger>
-                        <Button isIconOnly size="sm" variant="ghost" className="text-danger" onPress={() => setDeleteTarget(wh)}>
-                          <Trash2 size={16} />
-                        </Button>
-                      </Tooltip.Trigger>
-                      <Tooltip.Content>Eliminar webhook</Tooltip.Content>
-                    </Tooltip>
+                    <div className="flex items-center gap-1">
+                      <Tooltip>
+                        <Tooltip.Trigger>
+                          <Button isIconOnly size="sm" variant="ghost" onPress={() => openDetail(wh)}>
+                            <Eye size={16} className="text-muted" />
+                          </Button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Content>Ver detalle y entregas</Tooltip.Content>
+                      </Tooltip>
+                      <Tooltip>
+                        <Tooltip.Trigger>
+                          <Button isIconOnly size="sm" variant="ghost" className="text-danger" onPress={() => setDeleteTarget(wh)}>
+                            <Trash2 size={16} />
+                          </Button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Content>Eliminar webhook</Tooltip.Content>
+                      </Tooltip>
+                    </div>
                   </Table.Cell>
                 </Table.Row>
               )}
@@ -221,6 +304,195 @@ export default function Webhooks() {
                 <Modal.Footer>
                   <Button variant="secondary" onPress={modalState.close} isDisabled={creating}>Cancelar</Button>
                   <Button variant="primary" onPress={handleCreate} isPending={creating}>Crear</Button>
+                </Modal.Footer>
+              </Modal.Dialog>
+            </Modal.Container>
+          </Modal.Backdrop>
+        </Modal>
+      )}
+
+      {/* Modal detalle webhook + deliveries */}
+      {detailWebhook && (
+        <Modal>
+          <Modal.Backdrop
+            isOpen={!!detailWebhook}
+            onOpenChange={(open) => !open && setDetailWebhook(null)}
+            variant="blur"
+          >
+            <Modal.Container size="lg">
+              <Modal.Dialog>
+                <Modal.Header className="border-b border-border pb-4">
+                  <div className="flex items-start justify-between gap-3 w-full">
+                    <div className="min-w-0">
+                      <Modal.Heading className="text-lg font-bold flex items-center gap-2">
+                        <Send size={18} className="text-accent" />
+                        {detailWebhook.name}
+                      </Modal.Heading>
+                      <p className="text-xs text-muted font-normal mt-0.5 truncate font-mono">
+                        {detailWebhook.url}
+                      </p>
+                    </div>
+                    <Tooltip>
+                      <Tooltip.Trigger>
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="secondary"
+                          onPress={refreshDeliveries}
+                          isDisabled={loadingDeliveries}
+                        >
+                          <RefreshCw
+                            size={16}
+                            className={loadingDeliveries ? "animate-spin" : ""}
+                          />
+                        </Button>
+                      </Tooltip.Trigger>
+                      <Tooltip.Content>Refrescar entregas</Tooltip.Content>
+                    </Tooltip>
+                  </div>
+                </Modal.Header>
+                <Modal.Body className="space-y-5">
+                  {/* Stats */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <Card className="bg-default/5 border border-border">
+                      <Card.Content className="p-3">
+                        <p className="text-[10px] uppercase tracking-wider text-muted">
+                          Total entregas
+                        </p>
+                        <p className="text-xl font-bold">{deliveries.length}</p>
+                      </Card.Content>
+                    </Card>
+                    <Card className="bg-success/5 border border-success/20">
+                      <Card.Content className="p-3">
+                        <p className="text-[10px] uppercase tracking-wider text-muted">
+                          Exitosas
+                        </p>
+                        <p className="text-xl font-bold text-success">
+                          {deliveries.filter((d) => d.success).length}
+                        </p>
+                      </Card.Content>
+                    </Card>
+                    <Card className="bg-danger/5 border border-danger/20">
+                      <Card.Content className="p-3">
+                        <p className="text-[10px] uppercase tracking-wider text-muted">
+                          Fallidas
+                        </p>
+                        <p className="text-xl font-bold text-danger">
+                          {deliveries.filter((d) => !d.success).length}
+                        </p>
+                      </Card.Content>
+                    </Card>
+                  </div>
+
+                  {/* Eventos suscritos */}
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted mb-2">
+                      Eventos suscritos
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {detailWebhook.events.map((e) => (
+                        <Chip key={e} size="sm" variant="soft">
+                          {e}
+                        </Chip>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Lista de deliveries */}
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-muted mb-2">
+                      Ultimas entregas (max 20)
+                    </p>
+                    {loadingDeliveries && (
+                      <div className="space-y-2">
+                        {[...Array(3)].map((_, i) => (
+                          <Skeleton key={i} className="w-full h-14 rounded-lg" />
+                        ))}
+                      </div>
+                    )}
+                    {!loadingDeliveries && deliveries.length === 0 && (
+                      <p className="text-sm text-muted text-center py-6">
+                        Sin entregas registradas todavia.
+                      </p>
+                    )}
+                    {!loadingDeliveries && deliveries.length > 0 && (
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {deliveries.map((d) => (
+                          <div
+                            key={d.id}
+                            className={`p-3 rounded-lg border ${
+                              d.success
+                                ? "bg-success/5 border-success/20"
+                                : "bg-danger/5 border-danger/20"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-2 min-w-0 flex-1">
+                                {d.success ? (
+                                  <CheckCircle2
+                                    size={18}
+                                    className="text-success shrink-0 mt-0.5"
+                                  />
+                                ) : (
+                                  <XCircle
+                                    size={18}
+                                    className="text-danger shrink-0 mt-0.5"
+                                  />
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <Chip size="sm" variant="soft">
+                                      {d.event}
+                                    </Chip>
+                                    <Chip
+                                      size="sm"
+                                      variant="soft"
+                                      color={d.success ? "success" : "danger"}
+                                    >
+                                      HTTP {d.response_status ?? "—"}
+                                    </Chip>
+                                    <Chip size="sm" variant="soft">
+                                      intento #{d.attempt}
+                                    </Chip>
+                                  </div>
+                                  <div className="flex items-center gap-3 text-[11px] text-muted mt-1">
+                                    <span className="flex items-center gap-1">
+                                      <Clock size={11} />
+                                      {new Date(d.delivered_at).toLocaleString("es-ES")}
+                                    </span>
+                                    {d.duration_ms !== null && (
+                                      <span>{d.duration_ms} ms</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <Tooltip>
+                                <Tooltip.Trigger>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onPress={() => handleRetry(d)}
+                                    isPending={retryingId === d.id}
+                                  >
+                                    <RefreshCw size={14} />
+                                    Reintentar
+                                  </Button>
+                                </Tooltip.Trigger>
+                                <Tooltip.Content>
+                                  Reenviar este evento al webhook
+                                </Tooltip.Content>
+                              </Tooltip>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Modal.Body>
+                <Modal.Footer className="border-t border-border pt-4">
+                  <Button variant="secondary" onPress={() => setDetailWebhook(null)}>
+                    Cerrar
+                  </Button>
                 </Modal.Footer>
               </Modal.Dialog>
             </Modal.Container>

@@ -116,6 +116,20 @@ export const deleteWebhook = (id: number) =>
 export const listDeliveries = (webhookId: number) =>
   request<any[]>(`/api/webhooks/${webhookId}/deliveries`);
 
+export const retryDelivery = (webhookId: number, deliveryId: number) =>
+  request<{
+    id: number;
+    webhook_id: number;
+    event: string;
+    response_status: number | null;
+    success: boolean;
+    attempt: number;
+    delivered_at: string;
+    duration_ms: number | null;
+  }>(`/api/webhooks/${webhookId}/deliveries/${deliveryId}/retry`, {
+    method: "POST",
+  });
+
 // Audit
 export const listAuditLogs = (params?: {
   action?: string;
