@@ -6,7 +6,7 @@ import {
   Table,
   Tooltip,
 } from "@heroui/react";
-import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, ShieldAlert } from "lucide-react";
 import type { AuditLog as AuditLogType } from "@/types";
 import * as api from "@/api/client";
 import { toast } from "@/components/Toast";
@@ -17,6 +17,8 @@ const ACTIONS = [
   "token.revoke_all",
   "service.register",
   "service.delete",
+  "service.lock",
+  "service.unlock",
   "user.login",
   "user.logout",
   "user.create",
@@ -27,12 +29,20 @@ const ACTIONS = [
   "webhook.delete",
 ];
 
+const CRITICAL_ACTIONS = new Set([
+  "token.revoke_all",
+  "service.delete",
+  "service.lock",
+]);
+
 const actionColor: Record<string, "success" | "danger" | "warning" | "accent" | "default"> = {
   "token.generate": "success",
   "token.revoke": "danger",
   "token.revoke_all": "danger",
   "service.register": "accent",
   "service.delete": "danger",
+  "service.lock": "danger",
+  "service.unlock": "warning",
   "user.login": "success",
   "user.logout": "warning",
   "user.create": "accent",
@@ -46,12 +56,14 @@ export default function AuditLog() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [filter, setFilter] = useState<string>("");
+  const [criticalOnly, setCriticalOnly] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
       const data = await api.listAuditLogs({
-        action: filter || undefined,
+        action: criticalOnly ? undefined : (filter || undefined),
+        critical: criticalOnly || undefined,
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
       });
@@ -63,16 +75,39 @@ export default function AuditLog() {
     }
   };
 
-  useEffect(() => { load(); }, [page, filter]);
+  useEffect(() => { load(); }, [page, filter, criticalOnly]);
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold">Auditoria</h1>
         <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Tooltip>
+            <Tooltip.Trigger>
+              <button
+                type="button"
+                onClick={() => {
+                  setCriticalOnly((v) => !v);
+                  setPage(0);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                  criticalOnly
+                    ? "bg-danger/10 border-danger/40 text-danger"
+                    : "bg-surface border-border text-muted hover:border-danger/40"
+                }`}
+              >
+                <ShieldAlert size={15} />
+                Solo criticos
+              </button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>
+              Filtra revoke_all, service.delete y service.lock
+            </Tooltip.Content>
+          </Tooltip>
           <select
-            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent w-full sm:max-w-xs"
+            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent w-full sm:max-w-xs disabled:opacity-50"
             value={filter}
+            disabled={criticalOnly}
             onChange={(e) => {
               setFilter(e.target.value);
               setPage(0);
@@ -117,12 +152,25 @@ export default function AuditLog() {
                 )
               )}
             >
-              {(log: AuditLogType) => (
-                <Table.Row key={log.id} id={String(log.id)}>
+              {(log: AuditLogType) => {
+                const isCritical = CRITICAL_ACTIONS.has(log.action);
+                return (
+                <Table.Row
+                  key={log.id}
+                  id={String(log.id)}
+                  className={isCritical ? "bg-danger/5" : ""}
+                >
                   <Table.Cell className="text-sm text-muted whitespace-nowrap">
                     {new Date(log.timestamp).toLocaleString()}
                   </Table.Cell>
-                  <Table.Cell className="font-medium">{log.actor_username}</Table.Cell>
+                  <Table.Cell className="font-medium">
+                    <div className="flex items-center gap-1.5">
+                      {isCritical && (
+                        <ShieldAlert size={14} className="text-danger shrink-0" />
+                      )}
+                      {log.actor_username}
+                    </div>
+                  </Table.Cell>
                   <Table.Cell>
                     <Chip size="sm" color={actionColor[log.action] || "default"} variant="soft">
                       {log.action}
@@ -137,7 +185,8 @@ export default function AuditLog() {
                   </Table.Cell>
                   <Table.Cell className="text-sm text-muted">{log.ip_address || "-"}</Table.Cell>
                 </Table.Row>
-              )}
+                );
+              }}
             </Table.Body>
           </Table.Content>
         </Table.ScrollContainer>
