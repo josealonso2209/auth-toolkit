@@ -61,6 +61,10 @@ class TokenRevokeRequest(BaseModel):
     token_id: str
 
 
+class TokenTestRequest(BaseModel):
+    token: str
+
+
 # --- Services (proxy al auth-service) ---
 
 
