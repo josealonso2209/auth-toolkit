@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { CheckCircle, XCircle, AlertTriangle, X } from "lucide-react";
 import { create } from "zustand";
 
@@ -43,9 +42,9 @@ const icons = {
 };
 
 const colors = {
-  success: "bg-success-50 border-success-200 text-success-700 dark:bg-success-900/30 dark:border-success-800 dark:text-success-400",
-  error: "bg-danger-50 border-danger-200 text-danger-700 dark:bg-danger-900/30 dark:border-danger-800 dark:text-danger-400",
-  warning: "bg-warning-50 border-warning-200 text-warning-700 dark:bg-warning-900/30 dark:border-warning-800 dark:text-warning-400",
+  success: "bg-success/10 border-success/30 text-success",
+  error: "bg-danger/10 border-danger/30 text-danger",
+  warning: "bg-warning/10 border-warning/30 text-warning",
 };
 
 export function ToastContainer() {
@@ -60,7 +59,7 @@ export function ToastContainer() {
         return (
           <div
             key={t.id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg animate-appearance-in ${colors[t.type]}`}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg animate-[fadeIn_0.2s_ease-out] ${colors[t.type]}`}
           >
             <Icon size={18} className="flex-shrink-0" />
             <p className="text-sm flex-1">{t.message}</p>

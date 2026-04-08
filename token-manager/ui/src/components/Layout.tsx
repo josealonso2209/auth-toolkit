@@ -40,11 +40,11 @@ export default function Layout() {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile header */}
-        <header className="lg:hidden flex items-center gap-3 p-4 border-b border-divider bg-content1">
+        <header className="lg:hidden flex items-center gap-3 p-4 border-b border-border bg-surface">
           <Button
             isIconOnly
             size="sm"
-            variant="light"
+            variant="ghost"
             onPress={() => setMobileOpen(true)}
             aria-label="Abrir menu"
           >

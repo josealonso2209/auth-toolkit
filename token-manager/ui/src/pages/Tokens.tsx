@@ -2,30 +2,16 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Button,
   Card,
-  CardBody,
   Chip,
-  Divider,
+  Separator,
+  TextField,
+  Label,
   Input,
   Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Pagination,
-  Progress,
-  Select,
-  SelectItem,
+  ProgressBar,
   Skeleton,
-  Snippet,
   Table,
-  TableHeader,
-  TableColumn,
-  TableBody,
-  TableRow,
-  TableCell,
   Tooltip,
-  Autocomplete,
-  AutocompleteItem,
 } from "@heroui/react";
 import {
   Key as KeyIcon,
@@ -40,6 +26,7 @@ import {
   Server,
   Timer,
   X,
+  Check,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import * as api from "@/api/client";
@@ -55,7 +42,7 @@ const SCOPE_OPTIONS = [
 ];
 
 const columns = [
-  { key: "service", label: "SERVICIO" },
+  { key: "service", label: "SERVICIO", isRowHeader: true },
   { key: "token_id", label: "TOKEN ID" },
   { key: "scopes", label: "SCOPES" },
   { key: "expires", label: "EXPIRA" },
@@ -112,12 +99,13 @@ export default function Tokens() {
     service_name: "",
     client_id: "",
     client_secret: "",
-    scopes: new Set<string>(["read"]),
+    scopes: ["read"] as string[],
     expiration_days: "30",
   });
 
   const [revokeTarget, setRevokeTarget] = useState<ActiveToken | null>(null);
   const [revoking, setRevoking] = useState(false);
+  const [copiedToken, setCopiedToken] = useState(false);
 
   useEffect(() => {
     fetchTokens();
@@ -153,16 +141,16 @@ export default function Tokens() {
       service_name: "",
       client_id: "",
       client_secret: "",
-      scopes: new Set(["read"]),
+      scopes: ["read"],
       expiration_days: "30",
     });
     fetchServices();
     setGenerateOpen(true);
   };
 
-  const onServiceSelect = (key: React.Key | null) => {
+  const onServiceSelect = (key: any) => {
     if (!key) return;
-    const service = services.find((s: any) => s.service_id === key);
+    const service = services.find((s: any) => s.service_id === String(key));
     if (service) {
       setForm({
         ...form,
@@ -170,7 +158,7 @@ export default function Tokens() {
         service_name: service.service_name,
         client_id: service.client_id,
         client_secret: "",
-        scopes: new Set(service.allowed_scopes || ["read"]),
+        scopes: service.allowed_scopes || ["read"],
       });
     }
   };
@@ -192,7 +180,7 @@ export default function Tokens() {
         service_name: form.service_name,
         client_id: form.client_id,
         client_secret: form.client_secret,
-        scopes: Array.from(form.scopes),
+        scopes: form.scopes,
         expiration_days: parseInt(form.expiration_days),
       });
       setGeneratedToken(res.token);
@@ -230,6 +218,18 @@ export default function Tokens() {
     }
   };
 
+  const handleCopyGenerated = async () => {
+    if (!generatedToken) return;
+    try {
+      await navigator.clipboard.writeText(generatedToken);
+      setCopiedToken(true);
+      toast.success("Token copiado al portapapeles");
+      setTimeout(() => setCopiedToken(false), 2000);
+    } catch {
+      toast.error("No se pudo copiar al portapapeles");
+    }
+  };
+
   const filteredTokens = useMemo(() => {
     if (!filterValue) return tokens;
     const lower = filterValue.toLowerCase();
@@ -255,118 +255,14 @@ export default function Tokens() {
     return { total: tokens.length, services: uniqueServices, expiringSoon };
   }, [tokens]);
 
-  const renderCell = useCallback(
-    (token: ActiveToken, columnKey: React.Key) => {
-      switch (columnKey) {
-        case "service":
-          return (
-            <div>
-              <p className="font-medium text-sm">{token.service_name}</p>
-              <p className="text-xs text-default-400">{token.service_id}</p>
-            </div>
-          );
-        case "token_id":
-          return (
-            <Tooltip content="Clic para copiar token completo" placement="top">
-              <button
-                onClick={() => handleCopy(token.full_token_id)}
-                className="font-mono text-xs bg-default-100 dark:bg-default-50 px-2.5 py-1 rounded-md hover:bg-default-200 dark:hover:bg-default-100 transition-colors cursor-pointer"
-              >
-                {token.token_id}...
-              </button>
-            </Tooltip>
-          );
-        case "scopes":
-          return (
-            <div className="flex gap-1 flex-wrap">
-              {token.scopes.map((s) => (
-                <Chip
-                  key={s}
-                  size="sm"
-                  variant="flat"
-                  color={
-                    s === "admin"
-                      ? "danger"
-                      : s === "write" || s === "delete"
-                        ? "warning"
-                        : "primary"
-                  }
-                >
-                  {s}
-                </Chip>
-              ))}
-            </div>
-          );
-        case "expires":
-          return (
-            <div className="text-sm">
-              <p className="text-default-600">
-                {new Date(token.expires_at).toLocaleDateString("es-ES", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })}
-              </p>
-              <p className="text-xs text-default-400">
-                {new Date(token.expires_at).toLocaleTimeString("es-ES", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-            </div>
-          );
-        case "ttl": {
-          const ttlColor = getTTLColor(token.ttl_seconds);
-          const ttlPercent = getTTLPercent(token);
-          return (
-            <div className="flex items-center gap-2 min-w-[140px]">
-              <Progress
-                size="sm"
-                value={ttlPercent}
-                color={ttlColor}
-                className="w-16"
-                aria-label="TTL restante"
-              />
-              <Chip size="sm" variant="flat" color={ttlColor}>
-                {formatTTL(token.ttl_seconds)}
-              </Chip>
-            </div>
-          );
-        }
-        case "actions":
-          return (
-            <div className="flex items-center gap-1 justify-center">
-              <Tooltip content="Copiar Token ID">
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="light"
-                  onPress={() => handleCopy(token.full_token_id)}
-                >
-                  <Copy size={16} className="text-default-500" />
-                </Button>
-              </Tooltip>
-              {canManage && (
-                <Tooltip content="Revocar token" color="danger">
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="light"
-                    color="danger"
-                    onPress={() => setRevokeTarget(token)}
-                  >
-                    <Trash2 size={16} />
-                  </Button>
-                </Tooltip>
-              )}
-            </div>
-          );
-        default:
-          return null;
-      }
-    },
-    [canManage],
-  );
+  const toggleScope = (scope: string) => {
+    setForm((prev) => ({
+      ...prev,
+      scopes: prev.scopes.includes(scope)
+        ? prev.scopes.filter((s) => s !== scope)
+        : [...prev.scopes, scope],
+    }));
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -376,28 +272,31 @@ export default function Tokens() {
           <h1 className="text-3xl font-bold tracking-tight">
             Gestion de Tokens
           </h1>
-          <p className="text-default-500 mt-1">
+          <p className="text-muted mt-1">
             Genera y administra tokens de acceso para tus servicios.
           </p>
         </div>
         <div className="flex gap-2">
-          <Tooltip content="Refrescar lista">
-            <Button
-              isIconOnly
-              variant="flat"
-              onPress={fetchTokens}
-              isDisabled={loading}
-            >
-              <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-            </Button>
+          <Tooltip>
+            <Tooltip.Trigger>
+              <Button
+                isIconOnly
+                variant="secondary"
+                onPress={fetchTokens}
+                isDisabled={loading}
+              >
+                <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>Refrescar lista</Tooltip.Content>
           </Tooltip>
           {canManage && (
             <Button
-              color="primary"
-              startContent={<Plus size={18} />}
+              variant="primary"
               onPress={openGenerateModal}
-              className="font-semibold shadow-lg shadow-primary/20"
+              className="font-semibold shadow-lg shadow-accent/20"
             >
+              <Plus size={18} />
               Generar Token
             </Button>
           )}
@@ -406,8 +305,8 @@ export default function Tokens() {
 
       {/* Alerta de token generado */}
       {generatedToken && (
-        <Card className="bg-success/5 backdrop-blur-md border border-success/30 shadow-lg shadow-success/5 animate-appearance-in">
-          <CardBody className="py-4">
+        <Card className="bg-success/5 border border-success/30 shadow-lg shadow-success/5">
+          <Card.Content className="py-4">
             <div className="flex items-start gap-3">
               <ShieldCheck className="text-success mt-1 shrink-0" size={24} />
               <div className="flex-1 space-y-3">
@@ -419,72 +318,77 @@ export default function Tokens() {
                     Copialo ahora. Por seguridad, no se volvera a mostrar.
                   </p>
                 </div>
-                <Snippet
-                  symbol=""
-                  variant="flat"
-                  color="success"
-                  className="w-full"
-                  onCopy={() => toast.success("Token copiado al portapapeles")}
-                >
-                  {generatedToken}
-                </Snippet>
+                <div className="flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2">
+                  <pre className="text-sm font-mono flex-1 overflow-x-auto text-success">
+                    {generatedToken}
+                  </pre>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    onPress={handleCopyGenerated}
+                    aria-label="Copiar token"
+                  >
+                    {copiedToken ? <Check size={14} className="text-success" /> : <Copy size={14} className="text-success" />}
+                  </Button>
+                </div>
               </div>
               <Button
                 isIconOnly
                 size="sm"
-                variant="light"
+                variant="ghost"
                 onPress={() => setGeneratedToken(null)}
                 className="text-success/50 hover:text-success shrink-0"
               >
                 <X size={14} />
               </Button>
             </div>
-          </CardBody>
+          </Card.Content>
         </Card>
       )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="bg-content1/60 dark:bg-content1/40 backdrop-blur-lg border border-default-200/50 shadow-sm hover:shadow-md transition-shadow">
-          <CardBody className="flex flex-row items-center gap-4 py-4">
+        <Card className="bg-surface/60 backdrop-blur-lg border border-border shadow-sm hover:shadow-md transition-shadow">
+          <Card.Content className="flex flex-row items-center gap-4 py-4">
             {loading ? (
               <Skeleton className="w-full h-12 rounded-lg" />
             ) : (
               <>
-                <div className="p-2.5 bg-primary/10 rounded-xl ring-1 ring-primary/20 shadow-sm shadow-primary/10">
-                  <KeyIcon size={20} className="text-primary" />
+                <div className="p-2.5 bg-accent/10 rounded-xl ring-1 ring-accent/20 shadow-sm shadow-accent/10">
+                  <KeyIcon size={20} className="text-accent" />
                 </div>
                 <div>
-                  <p className="text-xs text-default-400 uppercase tracking-wider font-medium">
+                  <p className="text-xs text-muted uppercase tracking-wider font-medium">
                     Tokens Activos
                   </p>
                   <p className="text-2xl font-bold">{stats.total}</p>
                 </div>
               </>
             )}
-          </CardBody>
+          </Card.Content>
         </Card>
-        <Card className="bg-content1/60 dark:bg-content1/40 backdrop-blur-lg border border-default-200/50 shadow-sm hover:shadow-md transition-shadow">
-          <CardBody className="flex flex-row items-center gap-4 py-4">
+        <Card className="bg-surface/60 backdrop-blur-lg border border-border shadow-sm hover:shadow-md transition-shadow">
+          <Card.Content className="flex flex-row items-center gap-4 py-4">
             {loading ? (
               <Skeleton className="w-full h-12 rounded-lg" />
             ) : (
               <>
-                <div className="p-2.5 bg-secondary/10 rounded-xl ring-1 ring-secondary/20 shadow-sm shadow-secondary/10">
-                  <Server size={20} className="text-secondary" />
+                <div className="p-2.5 bg-default/10 rounded-xl ring-1 ring-default/20 shadow-sm">
+                  <Server size={20} className="text-muted" />
                 </div>
                 <div>
-                  <p className="text-xs text-default-400 uppercase tracking-wider font-medium">
+                  <p className="text-xs text-muted uppercase tracking-wider font-medium">
                     Servicios
                   </p>
                   <p className="text-2xl font-bold">{stats.services}</p>
                 </div>
               </>
             )}
-          </CardBody>
+          </Card.Content>
         </Card>
-        <Card className="bg-content1/60 dark:bg-content1/40 backdrop-blur-lg border border-default-200/50 shadow-sm hover:shadow-md transition-shadow">
-          <CardBody className="flex flex-row items-center gap-4 py-4">
+        <Card className="bg-surface/60 backdrop-blur-lg border border-border shadow-sm hover:shadow-md transition-shadow">
+          <Card.Content className="flex flex-row items-center gap-4 py-4">
             {loading ? (
               <Skeleton className="w-full h-12 rounded-lg" />
             ) : (
@@ -500,132 +404,216 @@ export default function Tokens() {
                   />
                 </div>
                 <div>
-                  <p className="text-xs text-default-400 uppercase tracking-wider font-medium">
+                  <p className="text-xs text-muted uppercase tracking-wider font-medium">
                     Expiran en &lt;24h
                   </p>
                   <p className="text-2xl font-bold">{stats.expiringSoon}</p>
                 </div>
               </>
             )}
-          </CardBody>
+          </Card.Content>
         </Card>
       </div>
 
       {/* Tabla de tokens */}
-      <Card className="bg-content1/60 dark:bg-content1/40 backdrop-blur-lg border border-default-200/50 shadow-lg">
-        <CardBody className="p-0">
+      <Card className="bg-surface/60 backdrop-blur-lg border border-border shadow-lg">
+        <Card.Content className="p-0">
           <div className="p-4 pb-2">
-            <Input
-              placeholder="Buscar por servicio o token ID..."
-              startContent={
-                <Search size={18} className="text-default-400 shrink-0" />
-              }
-              value={filterValue}
-              onValueChange={(v) => {
-                setFilterValue(v);
-                setPage(1);
-              }}
-              variant="bordered"
-              size="sm"
-              className="max-w-md"
-              isClearable
-              onClear={() => setFilterValue("")}
-            />
+            <TextField className="max-w-md">
+              <Label className="sr-only">Buscar</Label>
+              <Input
+                placeholder="Buscar por servicio o token ID..."
+                value={filterValue}
+                onChange={(e) => {
+                  setFilterValue(e.target.value);
+                  setPage(1);
+                }}
+              />
+            </TextField>
           </div>
 
-          <Table
-            aria-label="Tokens de servicio activos"
-            isHeaderSticky
-            isStriped
-            classNames={{
-              wrapper: "min-h-[320px]",
-              th: "bg-default-100 text-default-600 text-xs uppercase tracking-wider",
-            }}
-            bottomContent={
-              pages > 1 ? (
-                <div className="flex justify-center py-2">
-                  <Pagination
-                    total={pages}
-                    page={page}
-                    onChange={setPage}
-                    showControls
-                    color="primary"
-                    variant="flat"
-                    size="sm"
-                  />
-                </div>
-              ) : null
-            }
-          >
-            <TableHeader columns={columns}>
-              {(column) => (
-                <TableColumn
-                  key={column.key}
-                  align={column.key === "actions" ? "center" : "start"}
-                >
-                  {column.label}
-                </TableColumn>
-              )}
-            </TableHeader>
-            <TableBody
-              items={loading ? [] : paginatedTokens}
-              isLoading={loading}
-              loadingContent={
-                <div className="w-full space-y-3 p-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Skeleton key={i} className="w-full h-12 rounded-lg" />
-                  ))}
-                </div>
-              }
-              emptyContent={
-                <div className="py-12 text-center">
-                  <div className="inline-flex p-4 rounded-full bg-default-100 mb-4">
-                    <Shield size={40} className="text-default-300" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-default-600 mb-1">
-                    Sin tokens activos
-                  </h3>
-                  <p className="text-default-400 text-sm mb-4 max-w-sm mx-auto">
-                    {filterValue
-                      ? "No se encontraron tokens con ese filtro."
-                      : "Aun no hay tokens generados. Crea uno para empezar."}
-                  </p>
-                  {canManage && !filterValue && (
-                    <Button
-                      color="primary"
-                      variant="flat"
-                      startContent={<Plus size={16} />}
-                      onPress={openGenerateModal}
-                      size="sm"
+          <Table>
+            <Table.ScrollContainer>
+              <Table.Content aria-label="Tokens de servicio activos">
+                <Table.Header>
+                  {columns.map((col) => (
+                    <Table.Column
+                      key={col.key}
+                      isRowHeader={col.isRowHeader}
+                      className="bg-default/10 text-muted text-xs uppercase tracking-wider"
                     >
-                      Generar primer token
-                    </Button>
+                      {col.label}
+                    </Table.Column>
+                  ))}
+                </Table.Header>
+                <Table.Body
+                  items={loading ? [] : paginatedTokens}
+                  renderEmptyState={() => (
+                    <div className="py-12 text-center">
+                      <div className="inline-flex p-4 rounded-full bg-default/10 mb-4">
+                        <Shield size={40} className="text-muted/50" />
+                      </div>
+                      <h3 className="text-lg font-semibold text-muted mb-1">
+                        Sin tokens activos
+                      </h3>
+                      <p className="text-muted text-sm mb-4 max-w-sm mx-auto">
+                        {filterValue
+                          ? "No se encontraron tokens con ese filtro."
+                          : "Aun no hay tokens generados. Crea uno para empezar."}
+                      </p>
+                      {canManage && !filterValue && (
+                        <Button
+                          variant="secondary"
+                          onPress={openGenerateModal}
+                          size="sm"
+                        >
+                          <Plus size={16} />
+                          Generar primer token
+                        </Button>
+                      )}
+                    </div>
                   )}
+                >
+                  {(item: ActiveToken) => {
+                    const ttlColor = getTTLColor(item.ttl_seconds);
+                    const ttlPercent = getTTLPercent(item);
+                    return (
+                      <Table.Row id={item.full_token_id} key={item.full_token_id}>
+                        <Table.Cell>
+                          <div>
+                            <p className="font-medium text-sm">{item.service_name}</p>
+                            <p className="text-xs text-muted">{item.service_id}</p>
+                          </div>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Tooltip>
+                            <Tooltip.Trigger>
+                              <button
+                                onClick={() => handleCopy(item.full_token_id)}
+                                className="font-mono text-xs bg-default/10 px-2.5 py-1 rounded-md hover:bg-default/20 transition-colors cursor-pointer"
+                              >
+                                {item.token_id}...
+                              </button>
+                            </Tooltip.Trigger>
+                            <Tooltip.Content>Clic para copiar token completo</Tooltip.Content>
+                          </Tooltip>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <div className="flex gap-1 flex-wrap">
+                            {item.scopes.map((s) => (
+                              <Chip
+                                key={s}
+                                size="sm"
+                                variant="soft"
+                                color={
+                                  s === "admin"
+                                    ? "danger"
+                                    : s === "write" || s === "delete"
+                                      ? "warning"
+                                      : "accent"
+                                }
+                              >
+                                {s}
+                              </Chip>
+                            ))}
+                          </div>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <div className="text-sm">
+                            <p className="text-foreground">
+                              {new Date(item.expires_at).toLocaleDateString("es-ES", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              })}
+                            </p>
+                            <p className="text-xs text-muted">
+                              {new Date(item.expires_at).toLocaleTimeString("es-ES", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                          </div>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <div className="flex items-center gap-2 min-w-[140px]">
+                            <ProgressBar
+                              value={ttlPercent}
+                              color={ttlColor}
+                              className="w-16"
+                              aria-label="TTL restante"
+                            />
+                            <Chip size="sm" variant="soft" color={ttlColor}>
+                              {formatTTL(item.ttl_seconds)}
+                            </Chip>
+                          </div>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <div className="flex items-center gap-1 justify-center">
+                            <Tooltip>
+                              <Tooltip.Trigger>
+                                <Button
+                                  isIconOnly
+                                  size="sm"
+                                  variant="ghost"
+                                  onPress={() => handleCopy(item.full_token_id)}
+                                >
+                                  <Copy size={16} className="text-muted" />
+                                </Button>
+                              </Tooltip.Trigger>
+                              <Tooltip.Content>Copiar Token ID</Tooltip.Content>
+                            </Tooltip>
+                            {canManage && (
+                              <Tooltip>
+                                <Tooltip.Trigger>
+                                  <Button
+                                    isIconOnly
+                                    size="sm"
+                                    variant="ghost"
+                                    onPress={() => setRevokeTarget(item)}
+                                    className="text-danger"
+                                  >
+                                    <Trash2 size={16} />
+                                  </Button>
+                                </Tooltip.Trigger>
+                                <Tooltip.Content>Revocar token</Tooltip.Content>
+                              </Tooltip>
+                            )}
+                          </div>
+                        </Table.Cell>
+                      </Table.Row>
+                    );
+                  }}
+                </Table.Body>
+              </Table.Content>
+            </Table.ScrollContainer>
+            {pages > 1 && (
+              <Table.Footer>
+                <div className="flex justify-center items-center gap-2 py-2">
+                  <Button isIconOnly size="sm" variant="secondary" isDisabled={page <= 1} onPress={() => setPage(page - 1)}>
+                    <span className="text-xs">&lt;</span>
+                  </Button>
+                  <Chip size="sm" variant="soft">Pagina {page} de {pages}</Chip>
+                  <Button isIconOnly size="sm" variant="secondary" isDisabled={page >= pages} onPress={() => setPage(page + 1)}>
+                    <span className="text-xs">&gt;</span>
+                  </Button>
                 </div>
-              }
-            >
-              {(item) => (
-                <TableRow key={item.full_token_id}>
-                  {(columnKey) => (
-                    <TableCell>{renderCell(item, columnKey)}</TableCell>
-                  )}
-                </TableRow>
-              )}
-            </TableBody>
+              </Table.Footer>
+            )}
           </Table>
-        </CardBody>
+        </Card.Content>
       </Card>
 
       {/* Tips de seguridad */}
-      <Card className="bg-primary/5 backdrop-blur-md border border-primary/10">
-        <CardBody className="p-5">
+      <Card className="bg-accent/5 border border-accent/10">
+        <Card.Content className="p-5">
           <div className="flex gap-3">
-            <Info className="text-primary shrink-0 mt-0.5" size={18} />
+            <Info className="text-accent shrink-0 mt-0.5" size={18} />
             <div className="space-y-1">
-              <h4 className="font-semibold text-sm text-primary">
+              <h4 className="font-semibold text-sm text-accent">
                 Consejos de Seguridad
               </h4>
-              <ul className="text-xs space-y-1 text-default-500 list-disc ml-4">
+              <ul className="text-xs space-y-1 text-muted list-disc ml-4">
                 <li>Usa el tiempo de expiracion mas corto posible.</li>
                 <li>Asigna solo los scopes estrictamente necesarios.</li>
                 <li>Revoca inmediatamente tokens comprometidos.</li>
@@ -636,151 +624,138 @@ export default function Tokens() {
               </ul>
             </div>
           </div>
-        </CardBody>
+        </Card.Content>
       </Card>
 
       {/* Modal generar token */}
-      <Modal
-        isOpen={generateOpen}
-        onClose={() => setGenerateOpen(false)}
-        size="2xl"
-        backdrop="blur"
-        scrollBehavior="inside"
-        classNames={{
-          backdrop: "bg-black/40 backdrop-blur-sm",
-        }}
-      >
-        <ModalContent className="bg-content1/95 dark:bg-content1/90 backdrop-blur-xl border border-default-200/50 shadow-2xl">
-          <ModalHeader className="flex items-center gap-3 border-b border-default-200/30 pb-4">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <KeyIcon className="text-primary" size={20} />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold">Generar Nuevo Token</h2>
-              <p className="text-xs text-default-400 font-normal">
-                Selecciona un servicio o completa los campos manualmente
-              </p>
-            </div>
-          </ModalHeader>
-          <ModalBody>
-            <div className="space-y-5">
-              <Autocomplete
-                label="Seleccionar Servicio Registrado"
-                placeholder="Busca un servicio..."
-                isLoading={loadingServices}
-                onSelectionChange={onServiceSelect}
-                variant="bordered"
-                popoverProps={{ placement: "bottom", triggerScaleOnOpen: false }}
-              >
-                {services.map((item: any) => (
-                  <AutocompleteItem
-                    key={item.service_id}
-                    textValue={item.service_name}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span>{item.service_name}</span>
-                      <Chip size="sm" variant="flat">
-                        {item.service_id}
-                      </Chip>
+      {generateOpen && (
+        <Modal>
+          <Modal.Backdrop isOpen={generateOpen} onOpenChange={(open) => !open && setGenerateOpen(false)} variant="blur">
+            <Modal.Container size="lg">
+              <Modal.Dialog>
+                <Modal.Header className="flex items-center gap-3 border-b border-border pb-4">
+                  <div className="p-2 bg-accent/10 rounded-lg">
+                    <KeyIcon className="text-accent" size={20} />
+                  </div>
+                  <div>
+                    <Modal.Heading className="text-lg font-bold">Generar Nuevo Token</Modal.Heading>
+                    <p className="text-xs text-muted font-normal">
+                      Selecciona un servicio o completa los campos manualmente
+                    </p>
+                  </div>
+                </Modal.Header>
+                <Modal.Body>
+                  <div className="space-y-5">
+                    {/* Service selector */}
+                    <div>
+                      <label className="text-sm font-medium mb-1.5 block">Seleccionar Servicio Registrado</label>
+                      <select
+                        className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                        value={form.service_id}
+                        onChange={(e) => onServiceSelect(e.target.value)}
+                        disabled={loadingServices}
+                      >
+                        <option value="">Busca un servicio...</option>
+                        {services.map((item: any) => (
+                          <option key={item.service_id} value={item.service_id}>
+                            {item.service_name} ({item.service_id})
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                  </AutocompleteItem>
-                ))}
-              </Autocomplete>
 
-              <Divider />
+                    <Separator />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Service ID"
-                  variant="bordered"
-                  value={form.service_id}
-                  onValueChange={(v) => setForm({ ...form, service_id: v })}
-                  isRequired
-                  size="sm"
-                />
-                <Input
-                  label="Service Name"
-                  variant="bordered"
-                  value={form.service_name}
-                  onValueChange={(v) => setForm({ ...form, service_name: v })}
-                  isRequired
-                  size="sm"
-                />
-              </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <TextField isRequired>
+                        <Label>Service ID</Label>
+                        <Input
+                          value={form.service_id}
+                          onChange={(e) => setForm({ ...form, service_id: e.target.value })}
+                        />
+                      </TextField>
+                      <TextField isRequired>
+                        <Label>Service Name</Label>
+                        <Input
+                          value={form.service_name}
+                          onChange={(e) => setForm({ ...form, service_name: e.target.value })}
+                        />
+                      </TextField>
+                    </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Client ID"
-                  variant="bordered"
-                  value={form.client_id}
-                  onValueChange={(v) => setForm({ ...form, client_id: v })}
-                  isRequired
-                  size="sm"
-                />
-                <Input
-                  label="Client Secret"
-                  type="password"
-                  variant="bordered"
-                  value={form.client_secret}
-                  onValueChange={(v) =>
-                    setForm({ ...form, client_secret: v })
-                  }
-                  isRequired
-                  size="sm"
-                  description="Ingresa manualmente el secreto del cliente"
-                />
-              </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <TextField isRequired>
+                        <Label>Client ID</Label>
+                        <Input
+                          value={form.client_id}
+                          onChange={(e) => setForm({ ...form, client_id: e.target.value })}
+                        />
+                      </TextField>
+                      <TextField isRequired>
+                        <Label>Client Secret</Label>
+                        <Input
+                          type="password"
+                          value={form.client_secret}
+                          onChange={(e) => setForm({ ...form, client_secret: e.target.value })}
+                        />
+                      </TextField>
+                    </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Select
-                  label="Scopes (Permisos)"
-                  selectionMode="multiple"
-                  variant="bordered"
-                  selectedKeys={form.scopes}
-                  onSelectionChange={(keys) =>
-                    setForm({ ...form, scopes: keys as Set<string> })
-                  }
-                  size="sm"
-                  popoverProps={{ placement: "bottom", triggerScaleOnOpen: false }}
-                >
-                  {SCOPE_OPTIONS.map((s) => (
-                    <SelectItem key={s.key}>{s.label}</SelectItem>
-                  ))}
-                </Select>
-                <Input
-                  label="Expiracion (dias)"
-                  type="number"
-                  variant="bordered"
-                  value={form.expiration_days}
-                  onValueChange={(v) =>
-                    setForm({ ...form, expiration_days: v })
-                  }
-                  min={1}
-                  max={365}
-                  size="sm"
-                />
-              </div>
-            </div>
-          </ModalBody>
-          <ModalFooter className="border-t border-default-200/30 pt-4">
-            <Button
-              variant="flat"
-              onPress={() => setGenerateOpen(false)}
-              isDisabled={generating}
-            >
-              Cancelar
-            </Button>
-            <Button
-              color="primary"
-              isLoading={generating}
-              onPress={handleGenerate}
-              className="font-semibold shadow-lg shadow-primary/20"
-            >
-              Generar Token de Acceso
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 block">Scopes (Permisos)</label>
+                        <div className="flex flex-wrap gap-2">
+                          {SCOPE_OPTIONS.map((s) => (
+                            <button
+                              key={s.key}
+                              type="button"
+                              onClick={() => toggleScope(s.key)}
+                              className={`px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+                                form.scopes.includes(s.key)
+                                  ? "bg-accent text-accent-foreground border-accent"
+                                  : "bg-surface border-border text-muted hover:border-accent/50"
+                              }`}
+                            >
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <TextField>
+                        <Label>Expiracion (dias)</Label>
+                        <Input
+                          type="number"
+                          value={form.expiration_days}
+                          onChange={(e) => setForm({ ...form, expiration_days: e.target.value })}
+                          min={1}
+                          max={365}
+                        />
+                      </TextField>
+                    </div>
+                  </div>
+                </Modal.Body>
+                <Modal.Footer className="border-t border-border pt-4">
+                  <Button
+                    variant="secondary"
+                    onPress={() => setGenerateOpen(false)}
+                    isDisabled={generating}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="primary"
+                    isPending={generating}
+                    onPress={handleGenerate}
+                    className="font-semibold shadow-lg shadow-accent/20"
+                  >
+                    Generar Token de Acceso
+                  </Button>
+                </Modal.Footer>
+              </Modal.Dialog>
+            </Modal.Container>
+          </Modal.Backdrop>
+        </Modal>
+      )}
 
       {/* Modal confirmar revocacion */}
       <ConfirmModal

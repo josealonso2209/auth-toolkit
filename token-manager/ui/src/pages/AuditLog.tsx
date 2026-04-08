@@ -2,15 +2,8 @@ import { useEffect, useState } from "react";
 import {
   Button,
   Chip,
-  Select,
-  SelectItem,
   Skeleton,
   Table,
-  TableBody,
-  TableCell,
-  TableColumn,
-  TableHeader,
-  TableRow,
   Tooltip,
 } from "@heroui/react";
 import { ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
@@ -34,15 +27,15 @@ const ACTIONS = [
   "webhook.delete",
 ];
 
-const actionColor: Record<string, "success" | "danger" | "warning" | "primary" | "default"> = {
+const actionColor: Record<string, "success" | "danger" | "warning" | "accent" | "default"> = {
   "token.generate": "success",
   "token.revoke": "danger",
   "token.revoke_all": "danger",
-  "service.register": "primary",
+  "service.register": "accent",
   "service.delete": "danger",
   "user.login": "success",
   "user.logout": "warning",
-  "user.create": "primary",
+  "user.create": "accent",
   "user.delete": "danger",
 };
 
@@ -77,86 +70,94 @@ export default function AuditLog() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold">Auditoria</h1>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Select
-            label="Filtrar por accion"
-            className="w-full sm:max-w-xs"
-            size="sm"
-            selectedKeys={filter ? [filter] : []}
-            onSelectionChange={(keys) => {
-              setFilter(Array.from(keys)[0] as string || "");
+          <select
+            className="rounded-lg border border-border bg-surface px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent w-full sm:max-w-xs"
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
               setPage(0);
             }}
           >
-            {ACTIONS.map((a) => <SelectItem key={a}>{a}</SelectItem>)}
-          </Select>
-          <Tooltip content="Recargar">
-            <Button isIconOnly size="sm" variant="flat" onPress={load}>
-              <RefreshCw size={16} />
-            </Button>
+            <option value="">Todas las acciones</option>
+            {ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <Tooltip>
+            <Tooltip.Trigger>
+              <Button isIconOnly size="sm" variant="secondary" onPress={load}>
+                <RefreshCw size={16} />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>Recargar</Tooltip.Content>
           </Tooltip>
         </div>
       </div>
 
-      <Table aria-label="Audit logs">
-        <TableHeader>
-          <TableColumn>Fecha</TableColumn>
-          <TableColumn>Actor</TableColumn>
-          <TableColumn>Accion</TableColumn>
-          <TableColumn>Recurso</TableColumn>
-          <TableColumn>Detalle</TableColumn>
-          <TableColumn>IP</TableColumn>
-        </TableHeader>
-        <TableBody
-          items={logs}
-          isLoading={loading}
-          loadingContent={
-            <div className="w-full space-y-3 p-4">
-              {[...Array(6)].map((_, i) => (
-                <Skeleton key={i} className="w-full h-10 rounded-lg" />
-              ))}
-            </div>
-          }
-          emptyContent="Sin registros"
-        >
-          {(log) => (
-            <TableRow key={log.id}>
-              <TableCell className="text-sm text-default-400 whitespace-nowrap">
-                {new Date(log.timestamp).toLocaleString()}
-              </TableCell>
-              <TableCell className="font-medium">{log.actor_username}</TableCell>
-              <TableCell>
-                <Chip size="sm" color={actionColor[log.action] || "default"} variant="flat">
-                  {log.action}
-                </Chip>
-              </TableCell>
-              <TableCell className="text-sm">
-                {log.resource_type}
-                {log.resource_id ? `:${log.resource_id}` : ""}
-              </TableCell>
-              <TableCell className="text-xs text-default-400 max-w-xs truncate">
-                {log.detail ? JSON.stringify(log.detail) : "-"}
-              </TableCell>
-              <TableCell className="text-sm text-default-400">{log.ip_address || "-"}</TableCell>
-            </TableRow>
-          )}
-        </TableBody>
+      <Table>
+        <Table.ScrollContainer>
+          <Table.Content aria-label="Audit logs">
+            <Table.Header>
+              <Table.Column isRowHeader>Fecha</Table.Column>
+              <Table.Column>Actor</Table.Column>
+              <Table.Column>Accion</Table.Column>
+              <Table.Column>Recurso</Table.Column>
+              <Table.Column>Detalle</Table.Column>
+              <Table.Column>IP</Table.Column>
+            </Table.Header>
+            <Table.Body
+              items={logs}
+              renderEmptyState={() => (
+                loading ? (
+                  <div className="w-full space-y-3 p-4">
+                    {[...Array(6)].map((_, i) => (
+                      <Skeleton key={i} className="w-full h-10 rounded-lg" />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center py-8 text-muted">Sin registros</p>
+                )
+              )}
+            >
+              {(log: AuditLogType) => (
+                <Table.Row key={log.id} id={String(log.id)}>
+                  <Table.Cell className="text-sm text-muted whitespace-nowrap">
+                    {new Date(log.timestamp).toLocaleString()}
+                  </Table.Cell>
+                  <Table.Cell className="font-medium">{log.actor_username}</Table.Cell>
+                  <Table.Cell>
+                    <Chip size="sm" color={actionColor[log.action] || "default"} variant="soft">
+                      {log.action}
+                    </Chip>
+                  </Table.Cell>
+                  <Table.Cell className="text-sm">
+                    {log.resource_type}
+                    {log.resource_id ? `:${log.resource_id}` : ""}
+                  </Table.Cell>
+                  <Table.Cell className="text-xs text-muted max-w-xs truncate">
+                    {log.detail ? JSON.stringify(log.detail) : "-"}
+                  </Table.Cell>
+                  <Table.Cell className="text-sm text-muted">{log.ip_address || "-"}</Table.Cell>
+                </Table.Row>
+              )}
+            </Table.Body>
+          </Table.Content>
+        </Table.ScrollContainer>
       </Table>
 
       <div className="flex justify-center items-center gap-2">
         <Button
           isIconOnly
           size="sm"
-          variant="flat"
+          variant="secondary"
           isDisabled={page === 0}
           onPress={() => setPage(page - 1)}
         >
           <ChevronLeft size={16} />
         </Button>
-        <Chip variant="flat" size="sm">Pagina {page + 1}</Chip>
+        <Chip variant="soft" size="sm">Pagina {page + 1}</Chip>
         <Button
           isIconOnly
           size="sm"
-          variant="flat"
+          variant="secondary"
           isDisabled={logs.length < PAGE_SIZE}
           onPress={() => setPage(page + 1)}
         >

@@ -22,7 +22,7 @@ export default function ThemeToggle() {
     <Button
       isIconOnly
       size="sm"
-      variant="light"
+      variant="ghost"
       onPress={() => setDark(!dark)}
       aria-label="Cambiar tema"
     >
