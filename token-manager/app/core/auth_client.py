@@ -140,6 +140,16 @@ async def delete_service(service_id: str, bearer: str = "") -> bool:
     return resp.status_code == 200
 
 
+async def lock_service(service_id: str) -> bool:
+    resp = await _post(f"/api/v1/services/{service_id}/lock")
+    return resp.status_code == 200
+
+
+async def unlock_service(service_id: str) -> bool:
+    resp = await _post(f"/api/v1/services/{service_id}/unlock")
+    return resp.status_code == 200
+
+
 # --- Health ---
 
 

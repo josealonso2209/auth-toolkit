@@ -50,3 +50,21 @@ async def delete_service(service_id: str):
     if not token_manager.delete_service(service_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Servicio no encontrado")
     return SuccessResponse(message="Servicio y todos sus tokens eliminados")
+
+
+@router.post("/{service_id}/lock", response_model=SuccessResponse)
+async def lock_service(service_id: str):
+    """Desactiva un servicio: no podra obtener nuevos tokens hasta unlock."""
+    svc = token_manager.set_service_active(service_id, False)
+    if not svc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Servicio no encontrado")
+    return SuccessResponse(message=f"Servicio {service_id} bloqueado")
+
+
+@router.post("/{service_id}/unlock", response_model=SuccessResponse)
+async def unlock_service(service_id: str):
+    """Reactiva un servicio previamente bloqueado."""
+    svc = token_manager.set_service_active(service_id, True)
+    if not svc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Servicio no encontrado")
+    return SuccessResponse(message=f"Servicio {service_id} desbloqueado")

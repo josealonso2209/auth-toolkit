@@ -42,6 +42,7 @@ def get_logs(
     db: Session,
     *,
     action: str | None = None,
+    actions: list[str] | None = None,
     resource_type: str | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -49,6 +50,8 @@ def get_logs(
     query = db.query(AuditLog)
     if action:
         query = query.filter(AuditLog.action == action)
+    if actions:
+        query = query.filter(AuditLog.action.in_(actions))
     if resource_type:
         query = query.filter(AuditLog.resource_type == resource_type)
     return query.order_by(AuditLog.timestamp.desc()).offset(offset).limit(limit).all()
@@ -58,11 +61,14 @@ def count_logs(
     db: Session,
     *,
     action: str | None = None,
+    actions: list[str] | None = None,
     resource_type: str | None = None,
 ) -> int:
     query = db.query(AuditLog)
     if action:
         query = query.filter(AuditLog.action == action)
+    if actions:
+        query = query.filter(AuditLog.action.in_(actions))
     if resource_type:
         query = query.filter(AuditLog.resource_type == resource_type)
     return query.count()

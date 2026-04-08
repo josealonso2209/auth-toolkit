@@ -91,3 +91,100 @@ async def delete_service(
     })
 
     return {"success": True, "message": f"Servicio {service_id} eliminado"}
+
+
+@router.post("/{service_id}/lock")
+async def lock_service(
+    service_id: str,
+    request: Request,
+    user: AdminUser = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """Bloquea un servicio: deja de poder pedir nuevos tokens."""
+    ok = await auth_client.lock_service(service_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Servicio no encontrado")
+
+    audit.log_action(
+        db,
+        actor_id=user.id,
+        actor_username=user.username,
+        action="service.lock",
+        resource_type="service",
+        resource_id=service_id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("User-Agent"),
+    )
+
+    await webhook.fire_event(db, "service.locked", {
+        "service_id": service_id,
+        "locked_by": user.username,
+    })
+
+    return {"success": True, "message": f"Servicio {service_id} bloqueado"}
+
+
+@router.post("/{service_id}/unlock")
+async def unlock_service(
+    service_id: str,
+    request: Request,
+    user: AdminUser = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """Reactiva un servicio bloqueado."""
+    ok = await auth_client.unlock_service(service_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Servicio no encontrado")
+
+    audit.log_action(
+        db,
+        actor_id=user.id,
+        actor_username=user.username,
+        action="service.unlock",
+        resource_type="service",
+        resource_id=service_id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("User-Agent"),
+    )
+
+    await webhook.fire_event(db, "service.unlocked", {
+        "service_id": service_id,
+        "unlocked_by": user.username,
+    })
+
+    return {"success": True, "message": f"Servicio {service_id} desbloqueado"}
+
+
+@router.post("/{service_id}/revoke-all")
+async def revoke_all_service_tokens(
+    service_id: str,
+    request: Request,
+    user: AdminUser = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """Kill switch: revoca todos los tokens activos de un servicio."""
+    revoked = await auth_client.revoke_all_tokens(service_id)
+
+    audit.log_action(
+        db,
+        actor_id=user.id,
+        actor_username=user.username,
+        action="token.revoke_all",
+        resource_type="service",
+        resource_id=service_id,
+        detail={"revoked_count": revoked},
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("User-Agent"),
+    )
+
+    await webhook.fire_event(db, "token.revoked_all", {
+        "service_id": service_id,
+        "revoked_count": revoked,
+        "revoked_by": user.username,
+    })
+
+    return {
+        "success": True,
+        "message": f"{revoked} tokens revocados",
+        "revoked_count": revoked,
+    }

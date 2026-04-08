@@ -1,23 +1,31 @@
 import { useEffect, useState } from "react";
 import { Card, Chip, Skeleton } from "@heroui/react";
-import { Activity, ScrollText, Shield, Clock } from "lucide-react";
+import { Activity, ScrollText, Shield, Clock, ShieldAlert } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
 import * as api from "@/api/client";
+
+const CRITICAL_WINDOW_HOURS = 24;
 
 interface Stats {
   authServiceStatus: string | null;
   authServiceUptime: number | null;
   auditTotal: number;
   lastActions: any[];
+  lockedServices: any[];
+  recentCritical: any[];
 }
 
 export default function Dashboard() {
-  const { user } = useAuthStore();
+  const { user, hasRole } = useAuthStore();
+  const canSeeIncidents = hasRole("admin", "operator");
   const [stats, setStats] = useState<Stats>({
     authServiceStatus: null,
     authServiceUptime: null,
     auditTotal: 0,
     lastActions: [],
+    lockedServices: [],
+    recentCritical: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -27,16 +35,38 @@ export default function Dashboard() {
 
   const loadStats = async () => {
     try {
-      const [tokenStatus, auditCount, recentLogs] = await Promise.allSettled([
-        api.listTokensStatus(),
-        api.countAuditLogs().catch(() => ({ total: 0 })),
-        api.listAuditLogs({ limit: 8 }).catch(() => []),
-      ]);
+      const [tokenStatus, auditCount, recentLogs, services, criticalLogs] =
+        await Promise.allSettled([
+          api.listTokensStatus(),
+          api.countAuditLogs().catch(() => ({ total: 0 })),
+          api.listAuditLogs({ limit: 8 }).catch(() => []),
+          canSeeIncidents
+            ? api.listServices().catch(() => [])
+            : Promise.resolve([]),
+          hasRole("admin")
+            ? api
+                .listAuditLogs({ critical: true, limit: 20 })
+                .catch(() => [])
+            : Promise.resolve([]),
+        ]);
 
       const authData =
         tokenStatus.status === "fulfilled"
           ? tokenStatus.value.auth_service_status
           : null;
+
+      const allServices =
+        services.status === "fulfilled" ? services.value : [];
+      const locked = (allServices || []).filter(
+        (s: any) => s.is_active === false,
+      );
+
+      const cutoff = Date.now() - CRITICAL_WINDOW_HOURS * 3600 * 1000;
+      const allCritical =
+        criticalLogs.status === "fulfilled" ? criticalLogs.value : [];
+      const recentCritical = (allCritical || []).filter(
+        (l: any) => new Date(l.timestamp).getTime() >= cutoff,
+      );
 
       setStats({
         authServiceStatus: authData?.status || "error",
@@ -45,6 +75,8 @@ export default function Dashboard() {
           auditCount.status === "fulfilled" ? auditCount.value.total : 0,
         lastActions:
           recentLogs.status === "fulfilled" ? recentLogs.value : [],
+        lockedServices: locked,
+        recentCritical,
       });
     } catch {
     } finally {
@@ -61,6 +93,9 @@ export default function Dashboard() {
   };
 
   const isHealthy = stats.authServiceStatus === "healthy";
+  const hasLocked = stats.lockedServices.length > 0;
+  const hasRecentCritical = stats.recentCritical.length > 0;
+  const showIncidentBanner = !loading && (hasLocked || hasRecentCritical);
 
   return (
     <div className="space-y-8">
@@ -74,6 +109,74 @@ export default function Dashboard() {
           </Chip>
         </p>
       </div>
+
+      {/* Banner de incidente */}
+      {showIncidentBanner && (
+        <Card className="bg-danger/5 border border-danger/30 shadow-lg shadow-danger/5">
+          <Card.Content className="py-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-danger/10 rounded-lg ring-1 ring-danger/30 animate-pulse">
+                <ShieldAlert className="text-danger" size={22} />
+              </div>
+              <div className="flex-1 space-y-2">
+                <div>
+                  <h3 className="font-semibold text-danger">
+                    Atencion: actividad de seguridad detectada
+                  </h3>
+                  <p className="text-xs text-danger/80">
+                    Revisa los siguientes elementos antes de continuar.
+                  </p>
+                </div>
+                <ul className="text-sm space-y-1.5">
+                  {hasLocked && (
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-danger" />
+                      <span>
+                        <strong>{stats.lockedServices.length}</strong>{" "}
+                        servicio{stats.lockedServices.length === 1 ? "" : "s"}{" "}
+                        bloqueado{stats.lockedServices.length === 1 ? "" : "s"}:{" "}
+                        <span className="text-muted">
+                          {stats.lockedServices
+                            .slice(0, 3)
+                            .map((s: any) => s.service_name)
+                            .join(", ")}
+                          {stats.lockedServices.length > 3 &&
+                            ` +${stats.lockedServices.length - 3} mas`}
+                        </span>
+                        {" — "}
+                        <Link
+                          to="/services"
+                          className="text-danger underline hover:text-danger/80"
+                        >
+                          gestionar
+                        </Link>
+                      </span>
+                    </li>
+                  )}
+                  {hasRecentCritical && (
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-danger" />
+                      <span>
+                        <strong>{stats.recentCritical.length}</strong> evento
+                        {stats.recentCritical.length === 1 ? "" : "s"} critico
+                        {stats.recentCritical.length === 1 ? "" : "s"} en las
+                        ultimas {CRITICAL_WINDOW_HOURS}h
+                        {" — "}
+                        <Link
+                          to="/audit"
+                          className="text-danger underline hover:text-danger/80"
+                        >
+                          ver auditoria
+                        </Link>
+                      </span>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </Card.Content>
+        </Card>
+      )}
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
