@@ -134,6 +134,17 @@ def delete_service(service_id: str) -> bool:
     return True
 
 
+def set_service_active(service_id: str, is_active: bool) -> Optional[dict]:
+    """Activa o desactiva un servicio. Devuelve el servicio actualizado o None."""
+    svc = get_service_by_id(service_id)
+    if not svc:
+        return None
+    svc["is_active"] = is_active
+    redis_store.set_service(svc["client_id"], svc)
+    logger.info("Service %s set is_active=%s", service_id, is_active)
+    return svc
+
+
 # ---------------------------------------------------------------------------
 # Tokens
 # ---------------------------------------------------------------------------
