@@ -5,11 +5,21 @@ import {
   TextField,
   Label,
   Input,
+  Modal,
   Table,
   Chip,
   Tooltip,
 } from "@heroui/react";
-import { Server, Trash2, Plus } from "lucide-react";
+import {
+  Server,
+  Trash2,
+  Plus,
+  Lock,
+  Unlock,
+  ShieldAlert,
+  AlertTriangle,
+} from "lucide-react";
+import { useAuthStore } from "@/store/authStore";
 import * as api from "@/api/client";
 import { toast } from "@/components/Toast";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -22,6 +32,9 @@ const SCOPE_OPTIONS = [
 ];
 
 export default function Services() {
+  const { hasRole } = useAuthStore();
+  const isAdmin = hasRole("admin");
+
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [registering, setRegistering] = useState(false);
@@ -38,6 +51,11 @@ export default function Services() {
   });
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [lockTarget, setLockTarget] = useState<any | null>(null);
+  const [locking, setLocking] = useState(false);
+  const [panicTarget, setPanicTarget] = useState<any | null>(null);
+  const [panicConfirmInput, setPanicConfirmInput] = useState("");
+  const [panicRunning, setPanicRunning] = useState(false);
 
   useEffect(() => {
     fetchServices();
@@ -104,6 +122,58 @@ export default function Services() {
       setDeleteId(null);
     }
   };
+
+  const openLockTarget = (svc: any) => setLockTarget(svc);
+
+  const handleToggleLock = async () => {
+    if (!lockTarget) return;
+    setLocking(true);
+    try {
+      if (lockTarget.is_active === false) {
+        await api.unlockService(lockTarget.service_id);
+        toast.success(`Servicio "${lockTarget.service_name}" desbloqueado`);
+      } else {
+        await api.lockService(lockTarget.service_id);
+        toast.success(`Servicio "${lockTarget.service_name}" bloqueado`);
+      }
+      fetchServices();
+    } catch (err: any) {
+      toast.error(err.message || "Error al cambiar estado del servicio");
+    } finally {
+      setLocking(false);
+      setLockTarget(null);
+    }
+  };
+
+  const openPanic = (svc: any) => {
+    setPanicTarget(svc);
+    setPanicConfirmInput("");
+  };
+
+  const closePanic = () => {
+    setPanicTarget(null);
+    setPanicConfirmInput("");
+  };
+
+  const handlePanicRevoke = async () => {
+    if (!panicTarget) return;
+    setPanicRunning(true);
+    try {
+      const res = await api.revokeAllForService(panicTarget.service_id);
+      toast.success(
+        `Kill switch ejecutado: ${res.revoked_count} tokens revocados`,
+      );
+      fetchServices();
+      closePanic();
+    } catch (err: any) {
+      toast.error(err.message || "Error al ejecutar kill switch");
+    } finally {
+      setPanicRunning(false);
+    }
+  };
+
+  const panicConfirmed =
+    panicTarget && panicConfirmInput.trim() === panicTarget.service_id;
 
   return (
     <div className="space-y-8">
@@ -222,6 +292,7 @@ export default function Services() {
                 <Table.Column>CLIENT ID</Table.Column>
                 <Table.Column>SCOPES</Table.Column>
                 <Table.Column>RATE LIMIT</Table.Column>
+                <Table.Column>ESTADO</Table.Column>
                 <Table.Column className="text-center">ACCIONES</Table.Column>
               </Table.Header>
               <Table.Body
@@ -230,7 +301,9 @@ export default function Services() {
                   <p className="text-center py-8 text-muted">No hay servicios registrados.</p>
                 )}
               >
-                {(svc: any) => (
+                {(svc: any) => {
+                  const isLocked = svc.is_active === false;
+                  return (
                   <Table.Row key={svc.service_id} id={svc.service_id}>
                     <Table.Cell>
                       <div className="flex flex-col">
@@ -258,7 +331,57 @@ export default function Services() {
                       )}
                     </Table.Cell>
                     <Table.Cell>
-                      <div className="flex justify-center items-center gap-2">
+                      <Chip
+                        size="sm"
+                        color={isLocked ? "danger" : "success"}
+                        variant="soft"
+                      >
+                        <span
+                          className={`inline-block w-1.5 h-1.5 rounded-full mr-1 ${
+                            isLocked ? "bg-danger" : "bg-success animate-pulse"
+                          }`}
+                        />
+                        {isLocked ? "Bloqueado" : "Activo"}
+                      </Chip>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <div className="flex justify-center items-center gap-1">
+                        {isAdmin && (
+                          <Tooltip>
+                            <Tooltip.Trigger>
+                              <Button
+                                isIconOnly
+                                size="sm"
+                                variant="ghost"
+                                className={isLocked ? "text-warning" : "text-muted"}
+                                onPress={() => openLockTarget(svc)}
+                              >
+                                {isLocked ? <Unlock size={17} /> : <Lock size={17} />}
+                              </Button>
+                            </Tooltip.Trigger>
+                            <Tooltip.Content>
+                              {isLocked ? "Desbloquear servicio" : "Bloquear servicio"}
+                            </Tooltip.Content>
+                          </Tooltip>
+                        )}
+                        {isAdmin && (
+                          <Tooltip>
+                            <Tooltip.Trigger>
+                              <Button
+                                isIconOnly
+                                size="sm"
+                                variant="ghost"
+                                className="text-danger"
+                                onPress={() => openPanic(svc)}
+                              >
+                                <ShieldAlert size={18} />
+                              </Button>
+                            </Tooltip.Trigger>
+                            <Tooltip.Content>
+                              Kill switch: revocar todos los tokens
+                            </Tooltip.Content>
+                          </Tooltip>
+                        )}
                         <Tooltip>
                           <Tooltip.Trigger>
                             <Button
@@ -276,7 +399,8 @@ export default function Services() {
                       </div>
                     </Table.Cell>
                   </Table.Row>
-                )}
+                  );
+                }}
               </Table.Body>
             </Table.Content>
           </Table.ScrollContainer>
@@ -292,6 +416,109 @@ export default function Services() {
         confirmLabel="Eliminar"
         confirmColor="danger"
       />
+
+      <ConfirmModal
+        isOpen={!!lockTarget}
+        onClose={() => setLockTarget(null)}
+        onConfirm={handleToggleLock}
+        title={
+          lockTarget?.is_active === false
+            ? "Desbloquear servicio"
+            : "Bloquear servicio"
+        }
+        message={
+          lockTarget?.is_active === false
+            ? `El servicio "${lockTarget?.service_name}" volvera a poder pedir tokens. Sus tokens previamente revocados NO se restauran.`
+            : `El servicio "${lockTarget?.service_name}" no podra pedir nuevos tokens hasta que sea desbloqueado. Los tokens activos siguen siendo validos hasta que expiren o sean revocados.`
+        }
+        confirmLabel={lockTarget?.is_active === false ? "Desbloquear" : "Bloquear"}
+        confirmColor={lockTarget?.is_active === false ? "primary" : "danger"}
+        loading={locking}
+      />
+
+      {panicTarget && (
+        <Modal>
+          <Modal.Backdrop
+            isOpen={!!panicTarget}
+            onOpenChange={(open) => !open && closePanic()}
+            variant="blur"
+          >
+            <Modal.Container size="md">
+              <Modal.Dialog>
+                <Modal.Header className="flex items-center gap-3 border-b border-danger/20 pb-4">
+                  <div className="p-2 bg-danger/10 rounded-lg ring-1 ring-danger/30 animate-pulse">
+                    <ShieldAlert className="text-danger" size={22} />
+                  </div>
+                  <div>
+                    <Modal.Heading className="text-lg font-bold text-danger">
+                      Kill switch — Revocar todos los tokens
+                    </Modal.Heading>
+                    <p className="text-xs text-muted font-normal">
+                      Accion de emergencia, irreversible
+                    </p>
+                  </div>
+                </Modal.Header>
+                <Modal.Body className="space-y-4">
+                  <div className="flex gap-3 p-3 rounded-lg bg-danger/5 border border-danger/20">
+                    <AlertTriangle
+                      size={18}
+                      className="text-danger shrink-0 mt-0.5"
+                    />
+                    <div className="text-sm space-y-1">
+                      <p>
+                        Esta accion <strong>revocara TODOS los tokens activos</strong> del
+                        servicio{" "}
+                        <code className="px-1 py-0.5 bg-default/20 rounded">
+                          {panicTarget.service_name}
+                        </code>
+                        .
+                      </p>
+                      <p className="text-muted text-xs">
+                        Todos los microservicios que usen estos tokens dejaran de
+                        funcionar hasta generar tokens nuevos. Usa esto solo ante
+                        un incidente de seguridad.
+                      </p>
+                    </div>
+                  </div>
+
+                  <TextField>
+                    <Label className="text-sm">
+                      Para confirmar, escribe el service_id:{" "}
+                      <code className="px-1.5 py-0.5 bg-default/20 rounded font-mono text-xs">
+                        {panicTarget.service_id}
+                      </code>
+                    </Label>
+                    <Input
+                      autoFocus
+                      value={panicConfirmInput}
+                      onChange={(e) => setPanicConfirmInput(e.target.value)}
+                      placeholder={panicTarget.service_id}
+                    />
+                  </TextField>
+                </Modal.Body>
+                <Modal.Footer className="border-t border-border pt-4">
+                  <Button
+                    variant="secondary"
+                    onPress={closePanic}
+                    isDisabled={panicRunning}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="danger"
+                    isPending={panicRunning}
+                    isDisabled={!panicConfirmed}
+                    onPress={handlePanicRevoke}
+                    className="font-semibold"
+                  >
+                    Revocar todos los tokens
+                  </Button>
+                </Modal.Footer>
+              </Modal.Dialog>
+            </Modal.Container>
+          </Modal.Backdrop>
+        </Modal>
+      )}
     </div>
   );
 }

@@ -71,6 +71,24 @@ export const registerService = (data: any) =>
 export const deleteService = (serviceId: string) =>
   request(`/api/services/${serviceId}`, { method: "DELETE" });
 
+export const lockService = (serviceId: string) =>
+  request<{ success: boolean; message: string }>(
+    `/api/services/${serviceId}/lock`,
+    { method: "POST" }
+  );
+
+export const unlockService = (serviceId: string) =>
+  request<{ success: boolean; message: string }>(
+    `/api/services/${serviceId}/unlock`,
+    { method: "POST" }
+  );
+
+export const revokeAllForService = (serviceId: string) =>
+  request<{ success: boolean; message: string; revoked_count: number }>(
+    `/api/services/${serviceId}/revoke-all`,
+    { method: "POST" }
+  );
+
 // Users
 export const listUsers = () => request<any[]>("/api/users");
 
@@ -101,12 +119,16 @@ export const listDeliveries = (webhookId: number) =>
 // Audit
 export const listAuditLogs = (params?: {
   action?: string;
+  actions?: string;
+  critical?: boolean;
   resource_type?: string;
   limit?: number;
   offset?: number;
 }) => {
   const qs = new URLSearchParams();
   if (params?.action) qs.set("action", params.action);
+  if (params?.actions) qs.set("actions", params.actions);
+  if (params?.critical) qs.set("critical", "true");
   if (params?.resource_type) qs.set("resource_type", params.resource_type);
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.offset) qs.set("offset", String(params.offset));
@@ -114,8 +136,12 @@ export const listAuditLogs = (params?: {
   return request<any[]>(`/api/audit${query ? `?${query}` : ""}`);
 };
 
-export const countAuditLogs = () =>
-  request<{ total: number }>("/api/audit/count");
+export const countAuditLogs = (params?: { critical?: boolean }) => {
+  const qs = new URLSearchParams();
+  if (params?.critical) qs.set("critical", "true");
+  const query = qs.toString();
+  return request<{ total: number }>(`/api/audit/count${query ? `?${query}` : ""}`);
+};
 
 // Health
 export const healthCheck = () => request<any>("/health");
