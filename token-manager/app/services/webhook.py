@@ -21,6 +21,33 @@ def _sign_payload(payload: str, secret: str) -> str:
     return hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()
 
 
+async def retry_delivery(db: Session, webhook: Webhook, event: str, payload: dict) -> WebhookDelivery | None:
+    """Reintenta una entrega previa y devuelve la ultima nueva delivery creada.
+
+    Reusa `_deliver`, que persiste cada intento (hasta `_MAX_RETRIES`) en la tabla.
+    """
+    last_id = (
+        db.query(WebhookDelivery.id)
+        .filter(WebhookDelivery.webhook_id == webhook.id)
+        .order_by(WebhookDelivery.id.desc())
+        .first()
+    )
+    last_id_value = last_id[0] if last_id else 0
+
+    payload_json = json.dumps(payload, default=str)
+    await _deliver(db, webhook, event, payload, payload_json)
+
+    return (
+        db.query(WebhookDelivery)
+        .filter(
+            WebhookDelivery.webhook_id == webhook.id,
+            WebhookDelivery.id > last_id_value,
+        )
+        .order_by(WebhookDelivery.id.desc())
+        .first()
+    )
+
+
 async def fire_event(db: Session, event: str, payload: dict) -> int:
     """Dispara un evento a todos los webhooks suscritos. Retorna cantidad de entregas exitosas."""
     webhooks = (
