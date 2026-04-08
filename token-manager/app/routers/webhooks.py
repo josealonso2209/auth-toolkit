@@ -11,7 +11,7 @@ from app.models.schemas import (
     WebhookResponse,
     WebhookUpdate,
 )
-from app.services import audit
+from app.services import audit, webhook as webhook_service
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
@@ -165,3 +165,55 @@ async def list_deliveries(
         .limit(limit)
         .all()
     )
+
+
+@router.post("/{webhook_id}/deliveries/{delivery_id}/retry", response_model=WebhookDeliveryResponse)
+async def retry_delivery(
+    webhook_id: int,
+    delivery_id: int,
+    request: Request,
+    user: AdminUser = Depends(require_role("admin")),
+    db: Session = Depends(get_db),
+):
+    """Reintenta una entrega previa de un webhook. Util cuando el endpoint estuvo caido."""
+    wh = db.query(Webhook).filter(Webhook.id == webhook_id).first()
+    if not wh:
+        raise HTTPException(status_code=404, detail="Webhook no encontrado")
+
+    delivery = (
+        db.query(WebhookDelivery)
+        .filter(
+            WebhookDelivery.id == delivery_id,
+            WebhookDelivery.webhook_id == webhook_id,
+        )
+        .first()
+    )
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Delivery no encontrada")
+
+    new_delivery = await webhook_service.retry_delivery(
+        db, wh, delivery.event, delivery.payload or {}
+    )
+    if not new_delivery:
+        raise HTTPException(status_code=500, detail="No se pudo crear la nueva delivery")
+
+    audit.log_action(
+        db,
+        actor_id=user.id,
+        actor_username=user.username,
+        action="webhook.retry",
+        resource_type="webhook_delivery",
+        resource_id=str(new_delivery.id),
+        detail={
+            "webhook_id": webhook_id,
+            "webhook_name": wh.name,
+            "original_delivery_id": delivery_id,
+            "event": delivery.event,
+            "success": new_delivery.success,
+            "response_status": new_delivery.response_status,
+        },
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("User-Agent"),
+    )
+
+    return new_delivery
