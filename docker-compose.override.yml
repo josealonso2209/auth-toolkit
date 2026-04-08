@@ -1,10 +1,10 @@
 # Override para desarrollo local.
 # Se aplica automaticamente con `docker compose up`.
-# En produccion usar: docker compose -f docker-compose.yml up
+# En produccion usar: docker compose -f docker-compose.prod.yml up
 
 services:
   nginx:
-    ports:
+    ports: !override
       - "8088:80"
 
   redis:
@@ -35,8 +35,6 @@ services:
   token-manager:
     build:
       target: production
-    ports:
-      - "8200:8200"
     environment:
       LOG_LEVEL: debug
     read_only: false
