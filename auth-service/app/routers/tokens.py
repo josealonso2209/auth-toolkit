@@ -100,7 +100,6 @@ async def revoke_token(token_id: str):
 @router.delete(
     "/revoke-all/{service_id}",
     response_model=RevokeAllResponse,
-    dependencies=[Depends(require_valid_token)],
 )
 async def revoke_all_tokens(service_id: str):
     count = token_manager.revoke_all_tokens(service_id)

@@ -71,20 +71,28 @@ def admin_session(db, admin_user):
 
 @pytest.fixture()
 def mock_auth_client():
-    with patch("app.routers.tokens.auth_client") as mock:
-        mock.register_service = AsyncMock(return_value=True)
-        mock.generate_token = AsyncMock(return_value={
-            "access_token": "fake-access-token-abc123",
-            "refresh_token": "fake-refresh-token-xyz789",
-            "token_type": "Bearer",
-            "expires_in": 86400,
-            "scopes": ["read"],
-            "service_id": "test-svc",
-        })
-        mock.verify_token = AsyncMock(return_value={"service_id": "test-svc"})
-        mock.revoke_token = AsyncMock(return_value=True)
-        mock.health = AsyncMock(return_value={"status": "healthy"})
-        yield mock
+    with patch("app.routers.tokens.auth_client") as mock_tokens, \
+         patch("app.routers.services.auth_client") as mock_services:
+        for mock in (mock_tokens, mock_services):
+            mock.register_service = AsyncMock(return_value=True)
+            mock.generate_token = AsyncMock(return_value={
+                "access_token": "fake-access-token-abc123",
+                "refresh_token": "fake-refresh-token-xyz789",
+                "token_type": "Bearer",
+                "expires_in": 86400,
+                "scopes": ["read"],
+                "service_id": "test-svc",
+            })
+            mock.verify_token = AsyncMock(return_value={"service_id": "test-svc"})
+            mock.revoke_token = AsyncMock(return_value=True)
+            mock.revoke_all_tokens = AsyncMock(return_value=3)
+            mock.list_active_tokens = AsyncMock(return_value=[])
+            mock.list_services = AsyncMock(return_value=[])
+            mock.delete_service = AsyncMock(return_value=True)
+            mock.lock_service = AsyncMock(return_value=True)
+            mock.unlock_service = AsyncMock(return_value=True)
+            mock.health = AsyncMock(return_value={"status": "healthy"})
+        yield mock_tokens
 
 
 @pytest.fixture()
