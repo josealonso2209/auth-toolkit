@@ -85,6 +85,26 @@ export const registerService = (data: any) =>
     body: JSON.stringify(data),
   });
 
+export const bulkRegisterDevices = (data: {
+  prefix: string;
+  devices: { device_id: string; device_name: string; scopes: string[]; rate_limit: number }[];
+}) =>
+  request<{
+    success: boolean;
+    registered: number;
+    total: number;
+    devices: {
+      device_id: string;
+      service_id: string;
+      client_id: string;
+      client_secret: string;
+      success: boolean;
+    }[];
+  }>("/api/services/bulk-register", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
 export const deleteService = (serviceId: string) =>
   request(`/api/services/${serviceId}`, { method: "DELETE" });
 

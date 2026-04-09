@@ -5,7 +5,9 @@ from app.core import auth_client
 from app.core.database import get_db
 from app.dependencies.auth import get_current_user, require_role
 from app.models.db import AdminUser
-from app.models.schemas import MessageResponse, ServiceRegisterRequest
+import secrets
+
+from app.models.schemas import BulkRegisterRequest, MessageResponse, ServiceRegisterRequest
 from app.services import audit, webhook
 
 router = APIRouter(prefix="/api/services", tags=["services"])
@@ -61,6 +63,73 @@ async def register_service(
     })
 
     return {"success": True, "message": f"Servicio {data.service_id} registrado"}
+
+
+@router.post("/bulk-register")
+async def bulk_register_devices(
+    data: BulkRegisterRequest,
+    request: Request,
+    user: AdminUser = Depends(require_role("admin", "operator")),
+    db: Session = Depends(get_db),
+):
+    """Registra multiples dispositivos IoT/edge como servicios de golpe."""
+    results = []
+    for dev in data.devices:
+        sid = f"{data.prefix}-{dev.device_id}"
+        cid = f"{sid}-client"
+        csecret = secrets.token_urlsafe(32)
+        try:
+            ok = await auth_client.register_service(
+                service_id=sid,
+                service_name=dev.device_name,
+                client_id=cid,
+                client_secret=csecret,
+                description=f"IoT device: {dev.device_name}",
+                allowed_scopes=dev.scopes,
+                rate_limit=dev.rate_limit,
+            )
+            results.append({
+                "device_id": dev.device_id,
+                "service_id": sid,
+                "client_id": cid,
+                "client_secret": csecret,
+                "success": ok,
+            })
+            if ok:
+                audit.log_action(
+                    db,
+                    actor_id=user.id,
+                    actor_username=user.username,
+                    action="service.register",
+                    resource_type="service",
+                    resource_id=sid,
+                    detail={
+                        "service_name": dev.device_name,
+                        "bulk": True,
+                        "prefix": data.prefix,
+                        "allowed_scopes": dev.scopes,
+                    },
+                    ip_address=request.client.host if request.client else None,
+                    user_agent=request.headers.get("User-Agent"),
+                )
+        except Exception:
+            results.append({
+                "device_id": dev.device_id,
+                "service_id": sid,
+                "client_id": cid,
+                "client_secret": csecret,
+                "success": False,
+            })
+
+    registered = sum(1 for r in results if r["success"])
+    await webhook.fire_event(db, "service.bulk_registered", {
+        "prefix": data.prefix,
+        "total": len(data.devices),
+        "registered": registered,
+        "registered_by": user.username,
+    })
+
+    return {"success": True, "registered": registered, "total": len(data.devices), "devices": results}
 
 
 @router.delete("/{service_id}")
