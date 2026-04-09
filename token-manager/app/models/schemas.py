@@ -21,11 +21,18 @@ class LoginResponse(BaseModel):
 # --- Users ---
 
 
+class PartnerQuota(BaseModel):
+    max_services: int = 5
+    max_rate_limit: int = 100
+    allowed_scopes: list[str] = ["read", "write"]
+
+
 class UserCreate(BaseModel):
     username: str
     email: str
     password: str
     role: str = "viewer"
+    partner_quota: PartnerQuota | None = None
 
 
 class UserUpdate(BaseModel):
@@ -40,6 +47,7 @@ class UserResponse(BaseModel):
     email: str
     role: str
     is_active: bool
+    partner_quota: dict | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -154,3 +162,39 @@ class AuditLogResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+# --- Partner API Keys ---
+
+
+class PartnerKeyCreateRequest(BaseModel):
+    service_name: str
+    description: str = ""
+    scopes: list[str] = ["read"]
+    rate_limit: int = 0
+
+
+class PartnerKeyResponse(BaseModel):
+    service_id: str
+    service_name: str
+    client_id: str
+    client_secret: str
+    scopes: list[str]
+    rate_limit: int
+    created_at: str
+
+
+class PartnerKeyListItem(BaseModel):
+    service_id: str
+    service_name: str
+    client_id: str
+    scopes: list[str]
+    rate_limit: int
+    is_active: bool
+    created_at: str
+
+
+class PartnerQuotaUpdate(BaseModel):
+    max_services: int | None = None
+    max_rate_limit: int | None = None
+    allowed_scopes: list[str] | None = None

@@ -70,10 +70,38 @@ def admin_session(db, admin_user):
 
 
 @pytest.fixture()
+def partner_user(db):
+    user = AdminUser(
+        username="partner1",
+        email="partner1@test.local",
+        password_hash=hash_password("partner123"),
+        role="partner",
+        partner_quota={"max_services": 3, "max_rate_limit": 50, "allowed_scopes": ["read", "write"]},
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@pytest.fixture()
+def partner_session(db, partner_user):
+    session = AdminSession(
+        id="test-partner-session",
+        user_id=partner_user.id,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+    )
+    db.add(session)
+    db.commit()
+    return session
+
+
+@pytest.fixture()
 def mock_auth_client():
     with patch("app.routers.tokens.auth_client") as mock_tokens, \
-         patch("app.routers.services.auth_client") as mock_services:
-        for mock in (mock_tokens, mock_services):
+         patch("app.routers.services.auth_client") as mock_services, \
+         patch("app.routers.partner.auth_client") as mock_partner:
+        for mock in (mock_tokens, mock_services, mock_partner):
             mock.register_service = AsyncMock(return_value=True)
             mock.generate_token = AsyncMock(return_value={
                 "access_token": "fake-access-token-abc123",

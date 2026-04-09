@@ -9,8 +9,8 @@ from starlette.responses import FileResponse
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.core.security import hash_password
-from app.models.db import AdminUser, AdminSession, AuditLog, Webhook, WebhookDelivery
-from app.routers import audit, auth, services, tokens, users, webhooks
+from app.models.db import AdminUser, AdminSession, AuditLog, ServiceOwnership, Webhook, WebhookDelivery
+from app.routers import audit, auth, partner, services, tokens, users, webhooks
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -52,6 +52,7 @@ app.include_router(tokens.router)
 app.include_router(services.router)
 app.include_router(users.router)
 app.include_router(webhooks.router)
+app.include_router(partner.router)
 app.include_router(audit.router)
 
 
