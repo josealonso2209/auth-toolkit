@@ -20,6 +20,9 @@ import {
   ShieldAlert,
   AlertTriangle,
   Eye,
+  Copy,
+  EyeOff,
+  KeyRound,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import * as api from "@/api/client";
@@ -46,12 +49,13 @@ export default function Services() {
   const [form, setForm] = useState({
     service_id: "",
     service_name: "",
-    client_id: "",
-    client_secret: "",
     description: "",
     allowed_scopes: ["read", "write"] as string[],
     rate_limit: "0",
   });
+
+  const [created, setCreated] = useState<{ service_id: string; client_id: string; client_secret: string } | null>(null);
+  const [secretVisible, setSecretVisible] = useState(false);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [lockTarget, setLockTarget] = useState<any | null>(null);
@@ -89,17 +93,18 @@ export default function Services() {
     e.preventDefault();
     setRegistering(true);
     try {
-      await api.registerService({
-        ...form,
+      const res = await api.registerService({
+        service_id: form.service_id,
+        service_name: form.service_name,
+        description: form.description,
         allowed_scopes: form.allowed_scopes,
         rate_limit: parseInt(form.rate_limit),
       });
-      toast.success('Servicio registrado exitosamente');
+      setCreated({ service_id: res.service_id, client_id: res.client_id, client_secret: res.client_secret });
+      setSecretVisible(false);
       setForm({
         service_id: "",
         service_name: "",
-        client_id: "",
-        client_secret: "",
         description: "",
         allowed_scopes: ["read", "write"],
         rate_limit: "0",
@@ -218,23 +223,6 @@ export default function Services() {
                     placeholder="ej. Mi Microservicio"
                     value={form.service_name}
                     onChange={(e) => setForm({ ...form, service_name: e.target.value })}
-                  />
-                </TextField>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <TextField isRequired>
-                  <Label>Client ID</Label>
-                  <Input
-                    value={form.client_id}
-                    onChange={(e) => setForm({ ...form, client_id: e.target.value })}
-                  />
-                </TextField>
-                <TextField isRequired>
-                  <Label>Client Secret</Label>
-                  <Input
-                    type="password"
-                    value={form.client_secret}
-                    onChange={(e) => setForm({ ...form, client_secret: e.target.value })}
                   />
                 </TextField>
               </div>
@@ -452,6 +440,59 @@ export default function Services() {
         confirmColor={lockTarget?.is_active === false ? "primary" : "danger"}
         loading={locking}
       />
+
+      {/* Modal credenciales generadas */}
+      {created && (
+        <Modal>
+          <Modal.Backdrop isOpen={!!created} onOpenChange={(open) => !open && setCreated(null)} variant="blur">
+            <Modal.Container size="sm">
+              <Modal.Dialog>
+                <Modal.Header className="flex items-center gap-3 pb-4">
+                  <div className="p-2 bg-success/10 rounded-lg">
+                    <KeyRound className="text-success" size={20} />
+                  </div>
+                  <div>
+                    <Modal.Heading className="text-lg font-bold">Servicio registrado</Modal.Heading>
+                    <p className="text-xs text-muted font-normal">{created.service_id}</p>
+                  </div>
+                </Modal.Header>
+                <Modal.Body className="space-y-3">
+                  <div className="p-3 rounded-lg bg-warning/10 border border-warning/30">
+                    <p className="text-warning text-sm font-medium">Guarda el Client Secret ahora. No se mostrara de nuevo.</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted mb-1">Client ID</p>
+                    <code className="text-xs bg-default/10 px-2 py-1 rounded block">{created.client_id}</code>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted mb-1">Client Secret</p>
+                    <div className="flex gap-2 items-center">
+                      <code className="text-xs bg-default/10 px-2 py-1 rounded block flex-1 break-all">
+                        {secretVisible ? created.client_secret : "********************************"}
+                      </code>
+                      <Button isIconOnly size="sm" variant="ghost" onPress={() => setSecretVisible(!secretVisible)}>
+                        {secretVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </Button>
+                    </div>
+                  </div>
+                </Modal.Body>
+                <Modal.Footer className="border-t border-border pt-4">
+                  <Button variant="secondary" onPress={() => setCreated(null)}>Cerrar</Button>
+                  <Button
+                    variant="primary"
+                    onPress={() => {
+                      navigator.clipboard.writeText(`Client ID: ${created.client_id}\nClient Secret: ${created.client_secret}`);
+                      toast.success("Credenciales copiadas");
+                    }}
+                  >
+                    <Copy size={14} /> Copiar credenciales
+                  </Button>
+                </Modal.Footer>
+              </Modal.Dialog>
+            </Modal.Container>
+          </Modal.Backdrop>
+        </Modal>
+      )}
 
       {panicTarget && (
         <Modal>

@@ -22,7 +22,7 @@ export default function Login() {
     try {
       const res = await api.login(username, password);
       setAuth(res.user, res.session_id);
-      navigate("/");
+      navigate(res.user.role === "partner" ? "/api-keys" : "/");
     } catch (err: any) {
       setError(err.message || "Credenciales invalidas");
     } finally {
