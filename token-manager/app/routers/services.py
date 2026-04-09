@@ -27,11 +27,14 @@ async def register_service(
     user: AdminUser = Depends(require_role("admin", "operator")),
     db: Session = Depends(get_db),
 ):
+    client_id = data.client_id or f"{data.service_id}-client"
+    client_secret = data.client_secret or secrets.token_urlsafe(32)
+
     success = await auth_client.register_service(
         service_id=data.service_id,
         service_name=data.service_name,
-        client_id=data.client_id,
-        client_secret=data.client_secret,
+        client_id=client_id,
+        client_secret=client_secret,
         description=data.description,
         allowed_scopes=data.allowed_scopes,
         rate_limit=data.rate_limit,
@@ -62,7 +65,13 @@ async def register_service(
         "registered_by": user.username,
     })
 
-    return {"success": True, "message": f"Servicio {data.service_id} registrado"}
+    return {
+        "success": True,
+        "message": f"Servicio {data.service_id} registrado",
+        "service_id": data.service_id,
+        "client_id": client_id,
+        "client_secret": client_secret,
+    }
 
 
 @router.post("/bulk-register")

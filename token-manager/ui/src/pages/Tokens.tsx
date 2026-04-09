@@ -164,13 +164,12 @@ export default function Tokens() {
   };
 
   const handleGenerate = async () => {
-    if (
-      !form.service_id ||
-      !form.service_name ||
-      !form.client_id ||
-      !form.client_secret
-    ) {
-      toast.warning("Completa todos los campos requeridos");
+    if (!form.service_id || !form.client_id) {
+      toast.warning("Selecciona un servicio registrado");
+      return;
+    }
+    if (!form.client_secret) {
+      toast.warning("Ingresa el Client Secret del servicio");
       return;
     }
     setGenerating(true);
@@ -640,7 +639,7 @@ export default function Tokens() {
                   <div>
                     <Modal.Heading className="text-lg font-bold">Generar Nuevo Token</Modal.Heading>
                     <p className="text-xs text-muted font-normal">
-                      Selecciona un servicio o completa los campos manualmente
+                      Selecciona un servicio registrado y proporciona su Client Secret
                     </p>
                   </div>
                 </Modal.Header>
@@ -648,58 +647,50 @@ export default function Tokens() {
                   <div className="space-y-5">
                     {/* Service selector */}
                     <div>
-                      <label className="text-sm font-medium mb-1.5 block">Seleccionar Servicio Registrado</label>
+                      <label className="text-sm font-medium mb-1.5 block">Servicio <span className="text-danger">*</span></label>
                       <select
                         className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                         value={form.service_id}
                         onChange={(e) => onServiceSelect(e.target.value)}
                         disabled={loadingServices}
                       >
-                        <option value="">Busca un servicio...</option>
+                        <option value="">Selecciona un servicio...</option>
                         {services.map((item: any) => (
                           <option key={item.service_id} value={item.service_id}>
                             {item.service_name} ({item.service_id})
                           </option>
                         ))}
                       </select>
+                      {services.length === 0 && !loadingServices && (
+                        <p className="text-xs text-muted mt-1">No hay servicios registrados. Registra uno primero en Servicios.</p>
+                      )}
                     </div>
+
+                    {/* Service info (read-only) */}
+                    {form.service_id && (
+                      <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-default/5 border border-border">
+                        <div>
+                          <p className="text-xs text-muted">Service ID</p>
+                          <p className="text-sm font-medium">{form.service_id}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted">Client ID</p>
+                          <code className="text-xs">{form.client_id}</code>
+                        </div>
+                      </div>
+                    )}
 
                     <Separator />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <TextField isRequired>
-                        <Label>Service ID</Label>
-                        <Input
-                          value={form.service_id}
-                          onChange={(e) => setForm({ ...form, service_id: e.target.value })}
-                        />
-                      </TextField>
-                      <TextField isRequired>
-                        <Label>Service Name</Label>
-                        <Input
-                          value={form.service_name}
-                          onChange={(e) => setForm({ ...form, service_name: e.target.value })}
-                        />
-                      </TextField>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <TextField isRequired>
-                        <Label>Client ID</Label>
-                        <Input
-                          value={form.client_id}
-                          onChange={(e) => setForm({ ...form, client_id: e.target.value })}
-                        />
-                      </TextField>
-                      <TextField isRequired>
-                        <Label>Client Secret</Label>
-                        <Input
-                          type="password"
-                          value={form.client_secret}
-                          onChange={(e) => setForm({ ...form, client_secret: e.target.value })}
-                        />
-                      </TextField>
-                    </div>
+                    <TextField isRequired isDisabled={!form.service_id}>
+                      <Label>Client Secret</Label>
+                      <Input
+                        type="password"
+                        placeholder="Ingresa el client secret del servicio"
+                        value={form.client_secret}
+                        onChange={(e) => setForm({ ...form, client_secret: e.target.value })}
+                      />
+                    </TextField>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>

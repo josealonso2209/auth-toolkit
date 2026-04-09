@@ -80,10 +80,10 @@ export const testToken = (token: string) =>
 export const listServices = () => request<any[]>("/api/services");
 
 export const registerService = (data: any) =>
-  request("/api/services/register", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
+  request<{ success: boolean; message: string; service_id: string; client_id: string; client_secret: string }>(
+    "/api/services/register",
+    { method: "POST", body: JSON.stringify(data) }
+  );
 
 export const bulkRegisterDevices = (data: {
   prefix: string;

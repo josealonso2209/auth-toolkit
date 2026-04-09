@@ -79,8 +79,8 @@ class TokenTestRequest(BaseModel):
 class ServiceRegisterRequest(BaseModel):
     service_id: str
     service_name: str
-    client_id: str
-    client_secret: str
+    client_id: str | None = None
+    client_secret: str | None = None
     description: str = ""
     allowed_scopes: list[str] = ["read", "write"]
     rate_limit: int = 0
