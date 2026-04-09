@@ -1,10 +1,32 @@
+export interface PartnerQuota {
+  max_services: number;
+  max_rate_limit: number;
+  allowed_scopes: string[];
+}
+
 export interface User {
   id: number;
   username: string;
   email: string;
-  role: "admin" | "operator" | "viewer";
+  role: "admin" | "operator" | "viewer" | "partner";
+  is_active: boolean;
+  partner_quota: PartnerQuota | null;
+  created_at: string;
+}
+
+export interface PartnerKey {
+  service_id: string;
+  service_name: string;
+  client_id: string;
+  scopes: string[];
+  rate_limit: number;
   is_active: boolean;
   created_at: string;
+}
+
+export interface PartnerQuotaInfo {
+  quota: PartnerQuota;
+  usage: { services_used: number };
 }
 
 export interface AuditLog {

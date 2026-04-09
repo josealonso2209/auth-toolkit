@@ -196,5 +196,49 @@ export const countAuditLogs = (params?: { critical?: boolean }) => {
   return request<{ total: number }>(`/api/audit/count${query ? `?${query}` : ""}`);
 };
 
+// Partner API Keys
+export const listPartnerKeys = () =>
+  request<any[]>("/api/partner/keys");
+
+export const createPartnerKey = (data: {
+  service_name: string;
+  description?: string;
+  scopes: string[];
+  rate_limit: number;
+}) =>
+  request<{
+    service_id: string;
+    service_name: string;
+    client_id: string;
+    client_secret: string;
+    scopes: string[];
+    rate_limit: number;
+    created_at: string;
+  }>("/api/partner/keys", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
+export const deletePartnerKey = (serviceId: string) =>
+  request<{ success: boolean; message: string }>(
+    `/api/partner/keys/${serviceId}`,
+    { method: "DELETE" }
+  );
+
+export const getPartnerQuota = () =>
+  request<{
+    quota: { max_services: number; max_rate_limit: number; allowed_scopes: string[] };
+    usage: { services_used: number };
+  }>("/api/partner/quota");
+
+export const updatePartnerQuota = (
+  userId: number,
+  data: { max_services?: number; max_rate_limit?: number; allowed_scopes?: string[] }
+) =>
+  request<{ success: boolean; quota: any }>(`/api/users/${userId}/quota`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+
 // Health
 export const healthCheck = () => request<any>("/health");

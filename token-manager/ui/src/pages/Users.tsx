@@ -21,12 +21,14 @@ const ROLES = [
   { key: "admin", label: "Admin" },
   { key: "operator", label: "Operator" },
   { key: "viewer", label: "Viewer" },
+  { key: "partner", label: "Partner" },
 ];
 
 const roleColor: Record<string, "accent" | "default"> = {
   admin: "accent",
   operator: "default",
   viewer: "default",
+  partner: "default",
 };
 
 export default function Users() {

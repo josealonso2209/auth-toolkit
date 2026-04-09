@@ -6,6 +6,7 @@ import Tokens from "@/pages/Tokens";
 import Gateway from "@/pages/Gateway";
 import CICD from "@/pages/CICD";
 import IoT from "@/pages/IoT";
+import ApiKeys from "@/pages/ApiKeys";
 import Services from "@/pages/Services";
 import ServiceDetail from "@/pages/ServiceDetail";
 import Users from "@/pages/Users";
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/gateway" element={<Gateway />} />
           <Route path="/cicd" element={<CICD />} />
           <Route path="/iot" element={<IoT />} />
+          <Route path="/api-keys" element={<ApiKeys />} />
           <Route path="/services" element={<Services />} />
           <Route path="/services/:id" element={<ServiceDetail />} />
           <Route path="/users" element={<Users />} />
