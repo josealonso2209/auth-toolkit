@@ -16,12 +16,21 @@ from app.services import audit, webhook as webhook_service
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
 VALID_EVENTS = [
+    # Token events
     "token.generated",
     "token.revoked",
+    "token.revoked_all",
     "token.expired",
     "token.expiring_soon",
+    # Service events
     "service.registered",
     "service.deleted",
+    "service.bulk_registered",
+    "service.locked",
+    "service.unlocked",
+    # Partner events
+    "partner.key.created",
+    "partner.key.deleted",
 ]
 
 
