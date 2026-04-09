@@ -78,6 +78,18 @@ class ServiceRegisterRequest(BaseModel):
     rate_limit: int = 0
 
 
+class BulkDeviceItem(BaseModel):
+    device_id: str
+    device_name: str
+    scopes: list[str] = ["read"]
+    rate_limit: int = 10
+
+
+class BulkRegisterRequest(BaseModel):
+    prefix: str = "iot"
+    devices: list[BulkDeviceItem]
+
+
 # --- Webhooks ---
 
 
