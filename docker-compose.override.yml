@@ -37,4 +37,7 @@ services:
       target: production
     environment:
       LOG_LEVEL: debug
+    volumes:
+      - ./token-manager/tests:/app/tests
+      - ./token-manager/app:/app/app
     read_only: false

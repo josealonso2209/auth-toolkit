@@ -58,9 +58,12 @@ app.include_router(audit.router)
 
 @app.on_event("startup")
 def on_startup():
-    # Crear tablas si no existen
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database tables ensured")
+    # Crear tablas si no existen (try/except para race condition entre workers)
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables ensured")
+    except Exception as e:
+        logger.warning("create_all skipped (likely another worker created tables): %s", e)
 
     # Crear usuario admin por defecto si no existe
     from app.core.database import SessionLocal

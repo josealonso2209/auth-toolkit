@@ -95,3 +95,44 @@ def test_retry_delivery_requires_admin(client, db, admin_session):
 def test_retry_delivery_unauthorized(client):
     resp = client.post("/api/webhooks/1/deliveries/1/retry")
     assert resp.status_code == 401
+
+
+def test_create_webhook_with_new_events(client, admin_user, admin_session):
+    """Verifica que los eventos agregados en casos 3/4/9 son aceptados."""
+    new_events = [
+        "service.locked",
+        "service.unlocked",
+        "token.revoked_all",
+        "service.bulk_registered",
+        "partner.key.created",
+        "partner.key.deleted",
+    ]
+    resp = client.post(
+        "/api/webhooks",
+        json={"name": "new-events-wh", "url": "https://example.com/hook", "events": new_events},
+        headers={"X-Session-Id": admin_session.id},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert set(body["events"]) == set(new_events)
+
+
+def test_create_webhook_invalid_event_rejected(client, admin_user, admin_session):
+    resp = client.post(
+        "/api/webhooks",
+        json={"name": "bad-wh", "url": "https://example.com/hook", "events": ["fake.event"]},
+        headers={"X-Session-Id": admin_session.id},
+    )
+    assert resp.status_code == 400
+    assert "fake.event" in resp.json()["detail"]
+
+
+def test_update_webhook_events(client, admin_user, admin_session, db):
+    wh = _create_webhook(db)
+    resp = client.put(
+        f"/api/webhooks/{wh.id}",
+        json={"events": ["service.locked", "partner.key.created"]},
+        headers={"X-Session-Id": admin_session.id},
+    )
+    assert resp.status_code == 200
+    assert set(resp.json()["events"]) == {"service.locked", "partner.key.created"}

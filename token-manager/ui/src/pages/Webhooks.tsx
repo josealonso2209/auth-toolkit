@@ -21,6 +21,7 @@ import {
   XCircle,
   Clock,
   Send,
+  Pencil,
 } from "lucide-react";
 import type { Webhook } from "@/types";
 import * as api from "@/api/client";
@@ -39,14 +40,28 @@ type Delivery = {
   duration_ms: number | null;
 };
 
-const EVENTS = [
-  "token.generated",
-  "token.revoked",
-  "token.expired",
-  "token.expiring_soon",
-  "service.registered",
-  "service.deleted",
-];
+const EVENT_GROUPS: Record<string, string[]> = {
+  Token: [
+    "token.generated",
+    "token.revoked",
+    "token.revoked_all",
+    "token.expired",
+    "token.expiring_soon",
+  ],
+  Service: [
+    "service.registered",
+    "service.deleted",
+    "service.bulk_registered",
+    "service.locked",
+    "service.unlocked",
+  ],
+  Partner: [
+    "partner.key.created",
+    "partner.key.deleted",
+  ],
+};
+
+const ALL_EVENTS = Object.values(EVENT_GROUPS).flat();
 
 export default function Webhooks() {
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
@@ -57,6 +72,11 @@ export default function Webhooks() {
 
   const [deleteTarget, setDeleteTarget] = useState<Webhook | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Editar webhook
+  const [editTarget, setEditTarget] = useState<Webhook | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", url: "", secret: "", events: [] as string[] });
+  const [saving, setSaving] = useState(false);
 
   // Detalle + deliveries
   const [detailWebhook, setDetailWebhook] = useState<Webhook | null>(null);
@@ -86,6 +106,9 @@ export default function Webhooks() {
   };
 
   const handleCreate = async () => {
+    if (!form.name.trim()) return toast.error("El nombre es obligatorio");
+    if (!form.url.trim()) return toast.error("La URL es obligatoria");
+    if (form.events.length === 0) return toast.error("Selecciona al menos un evento");
     setCreating(true);
     try {
       await api.createWebhook({ ...form, events: form.events });
@@ -97,6 +120,44 @@ export default function Webhooks() {
       toast.error(err.message || "Error al crear webhook");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openEdit = (wh: Webhook) => {
+    setEditTarget(wh);
+    setEditForm({ name: wh.name, url: wh.url, secret: "", events: [...wh.events] });
+  };
+
+  const toggleEditEvent = (event: string) => {
+    setEditForm((prev) => ({
+      ...prev,
+      events: prev.events.includes(event)
+        ? prev.events.filter((e) => e !== event)
+        : [...prev.events, event],
+    }));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editTarget) return;
+    if (!editForm.name.trim()) return toast.error("El nombre es obligatorio");
+    if (!editForm.url.trim()) return toast.error("La URL es obligatoria");
+    if (editForm.events.length === 0) return toast.error("Selecciona al menos un evento");
+    setSaving(true);
+    try {
+      const payload: Record<string, unknown> = {
+        name: editForm.name,
+        url: editForm.url,
+        events: editForm.events,
+      };
+      if (editForm.secret) payload.secret = editForm.secret;
+      await api.updateWebhook(editTarget.id, payload);
+      toast.success(`Webhook "${editForm.name}" actualizado`);
+      setEditTarget(null);
+      load();
+    } catch (err: any) {
+      toast.error(err.message || "Error al actualizar webhook");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -244,6 +305,14 @@ export default function Webhooks() {
                       </Tooltip>
                       <Tooltip>
                         <Tooltip.Trigger>
+                          <Button isIconOnly size="sm" variant="ghost" onPress={() => openEdit(wh)}>
+                            <Pencil size={16} className="text-muted" />
+                          </Button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Content>Editar webhook</Tooltip.Content>
+                      </Tooltip>
+                      <Tooltip>
+                        <Tooltip.Trigger>
                           <Button isIconOnly size="sm" variant="ghost" className="text-danger" onPress={() => setDeleteTarget(wh)}>
                             <Trash2 size={16} />
                           </Button>
@@ -283,20 +352,27 @@ export default function Webhooks() {
                   </TextField>
                   <div>
                     <label className="text-sm font-medium mb-1.5 block">Eventos</label>
-                    <div className="flex flex-wrap gap-2">
-                      {EVENTS.map((e) => (
-                        <button
-                          key={e}
-                          type="button"
-                          onClick={() => toggleEvent(e)}
-                          className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
-                            form.events.includes(e)
-                              ? "bg-accent text-accent-foreground border-accent"
-                              : "bg-surface border-border text-muted hover:border-accent/50"
-                          }`}
-                        >
-                          {e}
-                        </button>
+                    <div className="space-y-3">
+                      {Object.entries(EVENT_GROUPS).map(([group, events]) => (
+                        <div key={group}>
+                          <p className="text-xs text-muted mb-1.5">{group}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {events.map((e) => (
+                              <button
+                                key={e}
+                                type="button"
+                                onClick={() => toggleEvent(e)}
+                                className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                                  form.events.includes(e)
+                                    ? "bg-accent text-accent-foreground border-accent"
+                                    : "bg-surface border-border text-muted hover:border-accent/50"
+                                }`}
+                              >
+                                {e}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -304,6 +380,65 @@ export default function Webhooks() {
                 <Modal.Footer>
                   <Button variant="secondary" onPress={modalState.close} isDisabled={creating}>Cancelar</Button>
                   <Button variant="primary" onPress={handleCreate} isPending={creating}>Crear</Button>
+                </Modal.Footer>
+              </Modal.Dialog>
+            </Modal.Container>
+          </Modal.Backdrop>
+        </Modal>
+      )}
+
+      {/* Modal editar webhook */}
+      {editTarget && (
+        <Modal>
+          <Modal.Backdrop isOpen={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+            <Modal.Container size="lg">
+              <Modal.Dialog>
+                <Modal.Header>
+                  <Modal.Heading>Editar Webhook</Modal.Heading>
+                </Modal.Header>
+                <Modal.Body className="space-y-4">
+                  <TextField>
+                    <Label>Nombre</Label>
+                    <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+                  </TextField>
+                  <TextField>
+                    <Label>URL</Label>
+                    <Input value={editForm.url} onChange={(e) => setEditForm({ ...editForm, url: e.target.value })} placeholder="https://..." />
+                  </TextField>
+                  <TextField>
+                    <Label>Secret (dejar vacio para mantener el actual)</Label>
+                    <Input value={editForm.secret} onChange={(e) => setEditForm({ ...editForm, secret: e.target.value })} placeholder="Sin cambios" />
+                  </TextField>
+                  <div>
+                    <label className="text-sm font-medium mb-1.5 block">Eventos</label>
+                    <div className="space-y-3">
+                      {Object.entries(EVENT_GROUPS).map(([group, events]) => (
+                        <div key={group}>
+                          <p className="text-xs text-muted mb-1.5">{group}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {events.map((e) => (
+                              <button
+                                key={e}
+                                type="button"
+                                onClick={() => toggleEditEvent(e)}
+                                className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                                  editForm.events.includes(e)
+                                    ? "bg-accent text-accent-foreground border-accent"
+                                    : "bg-surface border-border text-muted hover:border-accent/50"
+                                }`}
+                              >
+                                {e}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button variant="secondary" onPress={() => setEditTarget(null)} isDisabled={saving}>Cancelar</Button>
+                  <Button variant="primary" onPress={handleSaveEdit} isPending={saving}>Guardar</Button>
                 </Modal.Footer>
               </Modal.Dialog>
             </Modal.Container>
