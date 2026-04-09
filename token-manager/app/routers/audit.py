@@ -29,6 +29,7 @@ async def list_audit_logs(
     actions: str | None = Query(None, description="Filtrar por varias acciones (CSV)"),
     critical: bool = Query(False, description="Solo eventos criticos"),
     resource_type: str | None = Query(None, description="Filtrar por tipo de recurso"),
+    resource_id: str | None = Query(None, description="Filtrar por ID de recurso"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     user: AdminUser = Depends(require_role("admin")),
@@ -42,6 +43,7 @@ async def list_audit_logs(
         action=action,
         actions=actions_list,
         resource_type=resource_type,
+        resource_id=resource_id,
         limit=limit,
         offset=offset,
     )
@@ -53,6 +55,7 @@ async def count_audit_logs(
     actions: str | None = Query(None),
     critical: bool = Query(False),
     resource_type: str | None = Query(None),
+    resource_id: str | None = Query(None),
     user: AdminUser = Depends(require_role("admin")),
     db: Session = Depends(get_db),
 ):
@@ -64,5 +67,6 @@ async def count_audit_logs(
         action=action,
         actions=actions_list,
         resource_type=resource_type,
+        resource_id=resource_id,
     )
     return {"total": total}

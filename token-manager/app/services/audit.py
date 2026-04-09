@@ -44,6 +44,7 @@ def get_logs(
     action: str | None = None,
     actions: list[str] | None = None,
     resource_type: str | None = None,
+    resource_id: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[AuditLog]:
@@ -54,6 +55,8 @@ def get_logs(
         query = query.filter(AuditLog.action.in_(actions))
     if resource_type:
         query = query.filter(AuditLog.resource_type == resource_type)
+    if resource_id:
+        query = query.filter(AuditLog.resource_id == resource_id)
     return query.order_by(AuditLog.timestamp.desc()).offset(offset).limit(limit).all()
 
 
@@ -63,6 +66,7 @@ def count_logs(
     action: str | None = None,
     actions: list[str] | None = None,
     resource_type: str | None = None,
+    resource_id: str | None = None,
 ) -> int:
     query = db.query(AuditLog)
     if action:
@@ -71,4 +75,6 @@ def count_logs(
         query = query.filter(AuditLog.action.in_(actions))
     if resource_type:
         query = query.filter(AuditLog.resource_type == resource_type)
+    if resource_id:
+        query = query.filter(AuditLog.resource_id == resource_id)
     return query.count()
