@@ -153,6 +153,7 @@ export const listAuditLogs = (params?: {
   actions?: string;
   critical?: boolean;
   resource_type?: string;
+  resource_id?: string;
   limit?: number;
   offset?: number;
 }) => {
@@ -161,6 +162,7 @@ export const listAuditLogs = (params?: {
   if (params?.actions) qs.set("actions", params.actions);
   if (params?.critical) qs.set("critical", "true");
   if (params?.resource_type) qs.set("resource_type", params.resource_type);
+  if (params?.resource_id) qs.set("resource_id", params.resource_id);
   if (params?.limit) qs.set("limit", String(params.limit));
   if (params?.offset) qs.set("offset", String(params.offset));
   const query = qs.toString();

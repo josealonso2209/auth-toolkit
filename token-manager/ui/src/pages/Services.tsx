@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Button,
   Card,
@@ -18,6 +19,7 @@ import {
   Unlock,
   ShieldAlert,
   AlertTriangle,
+  Eye,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import * as api from "@/api/client";
@@ -32,6 +34,7 @@ const SCOPE_OPTIONS = [
 ];
 
 export default function Services() {
+  const navigate = useNavigate();
   const { hasRole } = useAuthStore();
   const isAdmin = hasRole("admin");
 
@@ -346,6 +349,20 @@ export default function Services() {
                     </Table.Cell>
                     <Table.Cell>
                       <div className="flex justify-center items-center gap-1">
+                        <Tooltip>
+                          <Tooltip.Trigger>
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="ghost"
+                              className="text-accent"
+                              onPress={() => navigate(`/services/${svc.service_id}`)}
+                            >
+                              <Eye size={17} />
+                            </Button>
+                          </Tooltip.Trigger>
+                          <Tooltip.Content>Ver detalle</Tooltip.Content>
+                        </Tooltip>
                         {isAdmin && (
                           <Tooltip>
                             <Tooltip.Trigger>

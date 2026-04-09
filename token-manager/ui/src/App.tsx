@@ -6,6 +6,7 @@ import Tokens from "@/pages/Tokens";
 import Gateway from "@/pages/Gateway";
 import CICD from "@/pages/CICD";
 import Services from "@/pages/Services";
+import ServiceDetail from "@/pages/ServiceDetail";
 import Users from "@/pages/Users";
 import Webhooks from "@/pages/Webhooks";
 import AuditLog from "@/pages/AuditLog";
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/gateway" element={<Gateway />} />
           <Route path="/cicd" element={<CICD />} />
           <Route path="/services" element={<Services />} />
+          <Route path="/services/:id" element={<ServiceDetail />} />
           <Route path="/users" element={<Users />} />
           <Route path="/webhooks" element={<Webhooks />} />
           <Route path="/audit" element={<AuditLog />} />
