@@ -200,7 +200,7 @@ async def retry_delivery(
     if not delivery:
         raise HTTPException(status_code=404, detail="Delivery no encontrada")
 
-    new_delivery = await webhook_service.retry_delivery(
+    new_delivery = webhook_service.retry_delivery(
         db, wh, delivery.event, delivery.payload or {}
     )
     if not new_delivery:

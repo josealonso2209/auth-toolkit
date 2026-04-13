@@ -126,7 +126,7 @@ async def create_partner_key(
     )
 
     # Webhook
-    await webhook.fire_event(db, "partner.key.created", {
+    webhook.fire_event(db, "partner.key.created", {
         "service_id": service_id,
         "partner": user.username,
         "service_name": data.service_name,
@@ -173,7 +173,7 @@ async def delete_partner_key(
         ip_address=request.client.host if request.client else None,
     )
 
-    await webhook.fire_event(db, "partner.key.deleted", {
+    webhook.fire_event(db, "partner.key.deleted", {
         "service_id": service_id,
         "partner": user.username,
     })

@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     cors_origins: str = ""
     log_level: str = "info"
 
+    # Celery
+    celery_broker_url: str = "redis://:auth_toolkit@redis:6379/1"
+    celery_result_backend: str = "redis://:auth_toolkit@redis:6379/2"
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
