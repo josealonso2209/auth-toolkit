@@ -6,9 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 
+from fastapi import Depends
+
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.core.security import hash_password
+from app.dependencies.auth import require_role
 from app.models.db import AdminUser, AdminSession, AuditLog, ServiceOwnership, Webhook, WebhookDelivery
 from app.routers import audit, auth, partner, services, tokens, users, webhooks
 
@@ -87,6 +90,53 @@ def on_startup():
 @app.get("/health")
 async def health():
     return {"status": "healthy", "service": "token-manager"}
+
+
+@app.get("/api/celery/status")
+async def celery_status(user: AdminUser = Depends(require_role("admin"))):
+    """Estado del cluster Celery: workers activos, tareas registradas y schedule."""
+    from app.celery_app import celery as celery_app
+
+    inspect = celery_app.control.inspect(timeout=2.0)
+    try:
+        ping = inspect.ping() or {}
+        active = inspect.active() or {}
+        scheduled = inspect.scheduled() or {}
+        stats = inspect.stats() or {}
+    except Exception as e:
+        return {
+            "status": "error",
+            "detail": str(e),
+            "workers": [],
+        }
+
+    workers = []
+    for name in ping:
+        worker_stats = stats.get(name, {})
+        workers.append({
+            "name": name,
+            "status": "online",
+            "active_tasks": len(active.get(name, [])),
+            "scheduled_tasks": len(scheduled.get(name, [])),
+            "total_tasks_executed": worker_stats.get("total", {}).get(
+                "app.tasks.webhook_tasks.deliver_webhook", 0
+            ) if isinstance(worker_stats.get("total"), dict) else 0,
+            "pool": worker_stats.get("pool", {}).get("implementation", ""),
+        })
+
+    beat_schedule = {
+        name: {
+            "task": entry["task"],
+            "schedule": str(entry["schedule"]),
+        }
+        for name, entry in celery_app.conf.beat_schedule.items()
+    }
+
+    return {
+        "status": "ok" if workers else "no_workers",
+        "workers": workers,
+        "beat_schedule": beat_schedule,
+    }
 
 
 # --- SPA: servir frontend React (solo en produccion con build) ---

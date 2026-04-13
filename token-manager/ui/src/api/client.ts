@@ -242,3 +242,19 @@ export const updatePartnerQuota = (
 
 // Health
 export const healthCheck = () => request<any>("/health");
+
+// Celery
+export const getCeleryStatus = () =>
+  request<{
+    status: string;
+    detail?: string;
+    workers: {
+      name: string;
+      status: string;
+      active_tasks: number;
+      scheduled_tasks: number;
+      total_tasks_executed: number;
+      pool: string;
+    }[];
+    beat_schedule?: Record<string, { task: string; schedule: string }>;
+  }>("/api/celery/status");

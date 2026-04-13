@@ -12,6 +12,7 @@ import ServiceDetail from "@/pages/ServiceDetail";
 import Users from "@/pages/Users";
 import Webhooks from "@/pages/Webhooks";
 import AuditLog from "@/pages/AuditLog";
+import Workers from "@/pages/Workers";
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/users" element={<Users />} />
           <Route path="/webhooks" element={<Webhooks />} />
           <Route path="/audit" element={<AuditLog />} />
+          <Route path="/workers" element={<Workers />} />
         </Route>
       </Routes>
     </BrowserRouter>

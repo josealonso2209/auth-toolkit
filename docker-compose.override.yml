@@ -41,3 +41,17 @@ services:
       - ./token-manager/tests:/app/tests
       - ./token-manager/app:/app/app
     read_only: false
+
+  celery-worker:
+    environment:
+      LOG_LEVEL: debug
+    volumes:
+      - ./token-manager/app:/app/app
+    read_only: false
+
+  celery-beat:
+    environment:
+      LOG_LEVEL: debug
+    volumes:
+      - ./token-manager/app:/app/app
+    read_only: false

@@ -59,7 +59,7 @@ async def register_service(
         user_agent=request.headers.get("User-Agent"),
     )
 
-    await webhook.fire_event(db, "service.registered", {
+    webhook.fire_event(db, "service.registered", {
         "service_id": data.service_id,
         "service_name": data.service_name,
         "registered_by": user.username,
@@ -131,7 +131,7 @@ async def bulk_register_devices(
             })
 
     registered = sum(1 for r in results if r["success"])
-    await webhook.fire_event(db, "service.bulk_registered", {
+    webhook.fire_event(db, "service.bulk_registered", {
         "prefix": data.prefix,
         "total": len(data.devices),
         "registered": registered,
@@ -163,7 +163,7 @@ async def delete_service(
         user_agent=request.headers.get("User-Agent"),
     )
 
-    await webhook.fire_event(db, "service.deleted", {
+    webhook.fire_event(db, "service.deleted", {
         "service_id": service_id,
         "deleted_by": user.username,
     })
@@ -194,7 +194,7 @@ async def lock_service(
         user_agent=request.headers.get("User-Agent"),
     )
 
-    await webhook.fire_event(db, "service.locked", {
+    webhook.fire_event(db, "service.locked", {
         "service_id": service_id,
         "locked_by": user.username,
     })
@@ -225,7 +225,7 @@ async def unlock_service(
         user_agent=request.headers.get("User-Agent"),
     )
 
-    await webhook.fire_event(db, "service.unlocked", {
+    webhook.fire_event(db, "service.unlocked", {
         "service_id": service_id,
         "unlocked_by": user.username,
     })
@@ -255,7 +255,7 @@ async def revoke_all_service_tokens(
         user_agent=request.headers.get("User-Agent"),
     )
 
-    await webhook.fire_event(db, "token.revoked_all", {
+    webhook.fire_event(db, "token.revoked_all", {
         "service_id": service_id,
         "revoked_count": revoked,
         "revoked_by": user.username,

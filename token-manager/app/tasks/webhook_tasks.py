@@ -1,21 +1,17 @@
-"""Motor de webhooks: dispara notificaciones HTTP ante eventos.
-
-fire_event() despacha la entrega a Celery en background.
-retry_delivery() ejecuta la entrega sincrona (accion manual del usuario).
-"""
+"""Tareas Celery para entrega de webhooks en background."""
 
 import hashlib
 import hmac
-import json
 import logging
 import time
 
 import httpx
-from sqlalchemy.orm import Session
 
+from app.celery_app import celery
+from app.core.database import SessionLocal
 from app.models.db import Webhook, WebhookDelivery
 
-logger = logging.getLogger("token-manager.webhooks")
+logger = logging.getLogger("token-manager.celery.webhooks")
 
 _TIMEOUT = 10.0
 _MAX_RETRIES = 3
@@ -25,14 +21,8 @@ def _sign_payload(payload_json: str, secret: str) -> str:
     return hmac.new(secret.encode(), payload_json.encode(), hashlib.sha256).hexdigest()
 
 
-def _deliver_sync(
-    db: Session,
-    webhook: Webhook,
-    event: str,
-    payload: dict,
-    payload_json: str,
-) -> bool:
-    """Entrega sincrona con reintentos internos. Para retry manual."""
+def _do_deliver(db, webhook: Webhook, event: str, payload: dict, payload_json: str) -> bool:
+    """Entrega sincrona con reintentos internos. Persiste cada intento en DB."""
     headers = {"Content-Type": "application/json", "X-Webhook-Event": event}
 
     if webhook.secret:
@@ -77,53 +67,21 @@ def _deliver_sync(
             delivery.success = False
             db.add(delivery)
             db.commit()
-
             logger.error("Webhook %s error: %s (attempt %d): %s", webhook.name, event, attempt, e)
 
     return False
 
 
-def retry_delivery(db: Session, webhook: Webhook, event: str, payload: dict) -> WebhookDelivery | None:
-    """Reintenta una entrega previa de forma sincrona y devuelve la nueva delivery."""
-    last_id = (
-        db.query(WebhookDelivery.id)
-        .filter(WebhookDelivery.webhook_id == webhook.id)
-        .order_by(WebhookDelivery.id.desc())
-        .first()
-    )
-    last_id_value = last_id[0] if last_id else 0
+@celery.task(name="app.tasks.webhook_tasks.deliver_webhook")
+def deliver_webhook(webhook_id: int, event: str, payload: dict, payload_json: str):
+    """Tarea Celery: entrega un webhook individual en background."""
+    db = SessionLocal()
+    try:
+        webhook = db.query(Webhook).filter(Webhook.id == webhook_id).first()
+        if not webhook or not webhook.is_active:
+            logger.info("Webhook %d no encontrado o inactivo, saltando", webhook_id)
+            return
 
-    payload_json = json.dumps(payload, default=str)
-    _deliver_sync(db, webhook, event, payload, payload_json)
-
-    return (
-        db.query(WebhookDelivery)
-        .filter(
-            WebhookDelivery.webhook_id == webhook.id,
-            WebhookDelivery.id > last_id_value,
-        )
-        .order_by(WebhookDelivery.id.desc())
-        .first()
-    )
-
-
-def fire_event(db: Session, event: str, payload: dict) -> int:
-    """Despacha la entrega de un evento a Celery. Retorna cantidad de tareas encoladas."""
-    from app.tasks.webhook_tasks import deliver_webhook
-
-    webhooks = (
-        db.query(Webhook)
-        .filter(Webhook.is_active == True, Webhook.events.contains([event]))
-        .all()
-    )
-
-    if not webhooks:
-        return 0
-
-    payload_json = json.dumps(payload, default=str)
-
-    for wh in webhooks:
-        deliver_webhook.delay(wh.id, event, payload, payload_json)
-
-    logger.info("Event %s dispatched to %d webhook(s) via Celery", event, len(webhooks))
-    return len(webhooks)
+        _do_deliver(db, webhook, event, payload, payload_json)
+    finally:
+        db.close()

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.models.db import Webhook, WebhookDelivery
 
@@ -48,7 +48,7 @@ def test_retry_delivery_success(client, admin_user, admin_session, db):
         delivered_at=datetime.now(timezone.utc),
         duration_ms=80,
     )
-    with patch("app.routers.webhooks.webhook_service.retry_delivery", new=AsyncMock(return_value=new_delivery_obj)):
+    with patch("app.routers.webhooks.webhook_service.retry_delivery", new=MagicMock(return_value=new_delivery_obj)):
         resp = client.post(
             f"/api/webhooks/{wh.id}/deliveries/{delivery.id}/retry",
             headers={"X-Session-Id": admin_session.id},

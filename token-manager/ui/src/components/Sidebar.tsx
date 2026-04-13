@@ -10,6 +10,7 @@ import {
   Users,
   Webhook,
   ScrollText,
+  Cog,
   LogOut,
   ChevronsLeft,
   ChevronsRight,
@@ -30,6 +31,7 @@ const navItems = [
   { path: "/users", label: "Usuarios", icon: Users, roles: ["admin"] },
   { path: "/webhooks", label: "Webhooks", icon: Webhook, roles: ["admin"] },
   { path: "/audit", label: "Auditoria", icon: ScrollText, roles: ["admin"] },
+  { path: "/workers", label: "Workers", icon: Cog, roles: ["admin"] },
 ];
 
 interface Props {

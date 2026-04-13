@@ -65,7 +65,7 @@ async def generate_token(
         user_agent=request.headers.get("User-Agent"),
     )
 
-    await webhook.fire_event(db, "token.generated", {
+    webhook.fire_event(db, "token.generated", {
         "service_id": data.service_id,
         "scopes": data.scopes,
         "expires_in": access_ttl,
@@ -107,7 +107,7 @@ async def revoke_token(
         user_agent=request.headers.get("User-Agent"),
     )
 
-    await webhook.fire_event(db, "token.revoked", {
+    webhook.fire_event(db, "token.revoked", {
         "token_id": data.token_id[:16],
         "service_id": service_id,
         "revoked_by": user.username,
