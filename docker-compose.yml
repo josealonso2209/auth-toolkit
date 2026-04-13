@@ -154,6 +154,9 @@ services:
     networks:
       - backend
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
     deploy:
       resources:
         limits:
@@ -164,7 +167,7 @@ services:
     build:
       context: ./token-manager
       target: production
-    command: celery -A app.celery_app:celery beat --loglevel=info
+    command: celery -A app.celery_app:celery beat --loglevel=info --schedule=/tmp/celerybeat-schedule
     environment:
       AUTH_SERVICE_URL: http://auth-service:8100
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
@@ -178,6 +181,9 @@ services:
     networks:
       - backend
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
     deploy:
       resources:
         limits:

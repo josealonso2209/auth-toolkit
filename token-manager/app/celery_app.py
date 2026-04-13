@@ -17,6 +17,7 @@ celery.conf.update(
     enable_utc=True,
     task_track_started=True,
     task_acks_late=True,
+    broker_connection_retry_on_startup=True,
     worker_prefetch_multiplier=4,
     result_expires=3600,
     beat_schedule={
