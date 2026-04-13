@@ -94,7 +94,7 @@ export default function Workers() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Chip color={statusColor} variant="flat">
+          <Chip color={statusColor} variant="soft">
             {statusLabel}
           </Chip>
           <Button
@@ -130,7 +130,7 @@ export default function Workers() {
                   </div>
                   <Chip
                     color={w.status === "online" ? "success" : "danger"}
-                    variant="dot"
+                    variant="soft"
                     size="sm"
                   >
                     {w.status}
@@ -190,7 +190,7 @@ export default function Workers() {
                     {scheduleLabels[name] || entry.task}
                   </p>
                 </div>
-                <Chip size="sm" variant="flat">
+                <Chip size="sm" variant="soft">
                   {entry.schedule}
                 </Chip>
               </Card>

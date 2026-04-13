@@ -100,7 +100,10 @@ def partner_session(db, partner_user):
 def mock_auth_client():
     with patch("app.routers.tokens.auth_client") as mock_tokens, \
          patch("app.routers.services.auth_client") as mock_services, \
-         patch("app.routers.partner.auth_client") as mock_partner:
+         patch("app.routers.partner.auth_client") as mock_partner, \
+         patch("app.routers.tokens.webhook.fire_event", return_value=0), \
+         patch("app.routers.services.webhook.fire_event", return_value=0), \
+         patch("app.routers.partner.webhook.fire_event", return_value=0):
         for mock in (mock_tokens, mock_services, mock_partner):
             mock.register_service = AsyncMock(return_value=True)
             mock.generate_token = AsyncMock(return_value={
